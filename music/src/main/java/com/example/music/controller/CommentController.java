@@ -48,7 +48,6 @@ public class CommentController {
     public BaseVo modify(String comment, int id) {
         long start = System.currentTimeMillis();
         long end;
-
         try {
             commentService.modify(comment,id);
 
