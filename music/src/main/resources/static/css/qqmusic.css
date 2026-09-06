@@ -1,0 +1,272 @@
+/* ==========================================================================
+   QQ 音乐风格主题 · 全站共用样式
+   页面通过 <link rel="stylesheet" href="css/qqmusic.css"> 引入，
+   仅保留页面独有的样式在各自的 <style> 中。
+   ========================================================================== */
+
+:root {
+  --qm-green: #31c27c;          /* 主色：QQ 音乐绿 */
+  --qm-green-dark: #26a768;
+  --qm-green-soft: #eaf9f1;     /* 绿色浅底（标签 / 选中态） */
+  --qm-bg: #f5f6f7;             /* 页面底色 */
+  --qm-card: #ffffff;
+  --qm-text: #33353c;
+  --qm-text-2: #8a9099;         /* 次级文字 */
+  --qm-text-3: #b3b8bf;         /* 占位 / 弱化文字 */
+  --qm-border: #ebedf0;
+  --qm-hover: #f7f8fa;
+  --qm-red: #ff5252;            /* 危险 / 红心 */
+  --qm-red-soft: #fff0f0;
+  --qm-gold: #ffb422;
+  --qm-side-w: 216px;
+  --qm-radius: 12px;
+  --qm-shadow: 0 2px 12px rgba(0, 0, 0, .05);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+               "Microsoft YaHei", "Segoe UI", sans-serif;
+  background: var(--qm-bg);
+  color: var(--qm-text);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--qm-green); text-decoration: none; }
+a:hover { color: var(--qm-green-dark); }
+
+/* 细滚动条，贴近客户端观感 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #d8dce0; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #c3c8ce; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ============================ 应用骨架 ============================ */
+/* 左侧固定导航 + 右侧内容区，由 js/shell.js 注入侧栏内容 */
+.qm-side {
+  position: fixed; top: 0; left: 0; bottom: 0; width: var(--qm-side-w);
+  background: #fff; border-right: 1px solid var(--qm-border);
+  display: flex; flex-direction: column; z-index: 40;
+}
+.qm-brand {
+  display: flex; align-items: center; gap: 10px; padding: 20px 20px 16px;
+  color: var(--qm-text); text-decoration: none;
+}
+.qm-brand .logo {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #4fdc9a, var(--qm-green));
+  color: #fff; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 3px 8px rgba(49, 194, 124, .35);
+}
+.qm-brand .name { font-size: 17px; font-weight: 700; letter-spacing: .5px; }
+.qm-brand .name small { display: block; font-size: 11px; font-weight: 400; color: var(--qm-text-3); letter-spacing: 0; }
+
+.qm-nav { flex: 1; overflow-y: auto; padding-bottom: 12px; }
+.qm-nav .group { font-size: 12px; color: var(--qm-text-3); padding: 14px 20px 6px; letter-spacing: .5px; }
+.qm-nav a {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px; font-size: 14px; color: #5c6672; text-decoration: none; transition: .12s;
+}
+.qm-nav a .ic { width: 18px; text-align: center; font-size: 15px; }
+.qm-nav a:hover { background: var(--qm-hover); color: var(--qm-text); }
+.qm-nav a.active { background: var(--qm-green-soft); color: var(--qm-green-dark); font-weight: 600; }
+.qm-nav a.active::before {
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px;
+  width: 3px; border-radius: 0 3px 3px 0; background: var(--qm-green);
+}
+
+.qm-side-foot { border-top: 1px solid var(--qm-border); padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+.qm-side-foot .avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: var(--qm-green-soft); color: var(--qm-green-dark);
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
+}
+.qm-side-foot .who { flex: 1; min-width: 0; }
+.qm-side-foot .who .n { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qm-side-foot .who .r { font-size: 11px; color: var(--qm-text-3); }
+.qm-side-foot .out {
+  background: none; color: var(--qm-text-3); padding: 4px 6px; font-size: 16px; border-radius: 6px;
+}
+.qm-side-foot .out:hover { background: var(--qm-hover); color: var(--qm-red); }
+
+.qm-main { margin-left: var(--qm-side-w); min-height: 100vh; display: flex; flex-direction: column; }
+
+/* 顶栏：返回 / 标题 / 右侧操作 */
+.qm-top {
+  position: sticky; top: 0; z-index: 30;
+  background: rgba(255, 255, 255, .9); backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--qm-border);
+  display: flex; align-items: center; gap: 14px; padding: 0 28px; height: 60px; flex-wrap: wrap;
+}
+.qm-top h1 { font-size: 19px; font-weight: 600; }
+.qm-top .sub { font-size: 12px; color: var(--qm-text-3); margin-top: 1px; }
+.qm-top .spacer { flex: 1; }
+.qm-top .acts { display: flex; align-items: center; gap: 10px; }
+.qm-back {
+  width: 30px; height: 30px; border-radius: 50%; background: var(--qm-hover); color: var(--qm-text-2);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 15px; text-decoration: none;
+  flex-shrink: 0; transition: .12s;
+}
+.qm-back:hover { background: #eceef1; color: var(--qm-text); }
+
+.qm-content { flex: 1; padding: 22px 28px 40px; }
+
+/* 圆形图标按钮（顶栏铃铛 / 设置等） */
+.icon-btn {
+  position: relative; width: 34px; height: 34px; border-radius: 50%; padding: 0;
+  background: var(--qm-hover); color: #5c6672; font-size: 16px; border: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; text-decoration: none; transition: .12s;
+}
+.icon-btn:hover { background: #eceef1; color: var(--qm-text); filter: none; transform: none; }
+.icon-btn .badge {
+  position: absolute; top: -3px; right: -3px; min-width: 17px; height: 17px; padding: 0 4px;
+  background: var(--qm-red); color: #fff; font-size: 11px; line-height: 17px; text-align: center;
+  border-radius: 9px; box-shadow: 0 0 0 2px #fff;
+}
+
+/* ============================ 表单控件 ============================ */
+input, select, textarea, button {
+  font-family: inherit; font-size: 14px; outline: none;
+}
+input, select, textarea {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--qm-border);
+  background: #fff; color: var(--qm-text); transition: .15s;
+}
+input::placeholder, textarea::placeholder { color: var(--qm-text-3); }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--qm-green); box-shadow: 0 0 0 3px rgba(49, 194, 124, .12);
+}
+input[type="file"] { padding: 7px 10px; background: var(--qm-hover); border-style: dashed; }
+select { cursor: pointer; }
+
+button {
+  cursor: pointer; border: none; color: #fff; background: var(--qm-green);
+  padding: 8px 18px; border-radius: 999px; transition: .15s; font-weight: 500;
+}
+button:hover { background: var(--qm-green-dark); }
+button:active { transform: scale(.97); }
+button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+button.ghost { background: #fff; color: #5c6672; border: 1px solid var(--qm-border); }
+button.ghost:hover { background: var(--qm-hover); border-color: #dcdfe4; color: var(--qm-text); }
+button.danger { background: #fff; color: var(--qm-red); border: 1px solid #ffd6d6; }
+button.danger:hover { background: var(--qm-red); color: #fff; border-color: var(--qm-red); }
+button.small { padding: 5px 14px; font-size: 13px; }
+
+/* ============================ 卡片 / 工具栏 ============================ */
+.card {
+  background: var(--qm-card); border-radius: var(--qm-radius); padding: 18px 20px;
+  margin-bottom: 16px; box-shadow: var(--qm-shadow);
+}
+.card.flush { padding: 6px 0; overflow: hidden; }
+.card-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.narrow { max-width: 880px; margin: 0 auto; }
+
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+/* 顶部搜索输入：QQ 音乐式胶囊搜索框 */
+.search {
+  padding: 8px 16px; border-radius: 999px; background: var(--qm-hover); border-color: transparent; width: 240px;
+}
+.search:focus { background: #fff; border-color: var(--qm-green); }
+
+/* ============================ 表格 ============================ */
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--qm-border); font-size: 14px; }
+th { color: var(--qm-text-2); font-weight: 500; font-size: 12px; letter-spacing: .04em; }
+tbody tr { transition: .12s; }
+tbody tr:hover td { background: var(--qm-hover); }
+tbody tr:last-child td { border-bottom: none; }
+
+/* ============================ 标签 / 空态 / 分页 ============================ */
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  font-size: 11px; background: var(--qm-green-soft); color: var(--qm-green-dark);
+  padding: 2px 9px; border-radius: 999px;
+}
+.empty, .state { text-align: center; color: var(--qm-text-3); padding: 46px 20px; font-size: 14px; }
+
+.pager { display: flex; gap: 10px; align-items: center; justify-content: center; }
+.pager .pn { font-size: 13px; color: var(--qm-text-2); min-width: 90px; text-align: center; }
+
+/* ============================ 弹窗 ============================ */
+.mask {
+  position: fixed; inset: 0; background: rgba(20, 22, 26, .45);
+  display: none; align-items: center; justify-content: center; z-index: 50;
+  backdrop-filter: blur(2px);
+}
+.mask.show { display: flex; }
+.modal {
+  background: #fff; border-radius: 16px; padding: 24px; width: 460px; max-width: 92vw;
+  max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+  animation: qmPop .18s ease-out;
+}
+@keyframes qmPop { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.modal h3 { font-size: 17px; margin-bottom: 18px; }
+.field { margin-bottom: 13px; }
+.field label { display: block; font-size: 13px; color: var(--qm-text-2); margin-bottom: 6px; }
+.field input, .field select, .field textarea { width: 100%; }
+.field textarea { resize: vertical; min-height: 64px; line-height: 1.6; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+/* ============================ Toast ============================ */
+#toast {
+  position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-8px);
+  padding: 10px 20px; border-radius: 999px; color: #fff; font-size: 14px;
+  opacity: 0; transition: .25s; pointer-events: none; z-index: 100;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .16);
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.ok { background: var(--qm-green); }
+#toast.err { background: var(--qm-red); }
+
+/* ============================ 音频播放器 ============================ */
+audio { width: 100%; height: 34px; }
+audio::-webkit-media-controls-panel { background: var(--qm-hover); }
+
+/* ============================ 登录 / 注册等居中页 ============================ */
+body.qm-auth {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: linear-gradient(135deg, #31c27c 0%, #1ea9a0 55%, #12968f 100%);
+  background-attachment: fixed;
+}
+/* 背景光晕，模拟客户端启动页；用 fixed 定位以免撑出滚动条 */
+body.qm-auth::before, body.qm-auth::after {
+  content: ""; position: fixed; border-radius: 50%; background: rgba(255, 255, 255, .12);
+}
+body.qm-auth::before { width: 420px; height: 420px; top: -140px; right: -100px; }
+body.qm-auth::after { width: 320px; height: 320px; bottom: -120px; left: -80px; }
+
+.auth-card {
+  position: relative; z-index: 1;
+  background: #fff; border-radius: 18px; padding: 34px 32px; width: 380px; max-width: 92vw;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .22);
+}
+.auth-card.wide { width: 480px; max-width: 94vw; }
+.auth-card .logo {
+  width: 58px; height: 58px; margin: 0 auto; border-radius: 50%;
+  background: linear-gradient(135deg, #4fdc9a, var(--qm-green));
+  color: #fff; font-size: 28px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px rgba(49, 194, 124, .38);
+}
+.auth-card h1 { font-size: 21px; text-align: center; margin: 14px 0 4px; }
+.auth-card .sub { text-align: center; color: var(--qm-text-3); font-size: 13px; margin-bottom: 24px; }
+.auth-card .field input, .auth-card .field select { padding: 11px 14px; font-size: 15px; border-radius: 10px; }
+.auth-card .row { display: flex; gap: 12px; }
+.auth-card .row .field { flex: 1; }
+.auth-card .primary {
+  width: 100%; font-size: 16px; padding: 12px; border-radius: 999px; margin-top: 6px;
+  box-shadow: 0 6px 16px rgba(49, 194, 124, .32);
+}
+.auth-card .err { color: var(--qm-red); font-size: 13px; min-height: 18px; margin-top: 12px; text-align: center; }
+.auth-card .foot { text-align: center; font-size: 13px; color: var(--qm-text-3); margin-top: 18px; }
+
+/* ============================ 窄屏适配 ============================ */
+@media (max-width: 900px) {
+  :root { --qm-side-w: 0px; }
+  .qm-side { display: none; }
+  .qm-top { padding: 0 16px; }
+  .qm-content { padding: 16px; }
+}

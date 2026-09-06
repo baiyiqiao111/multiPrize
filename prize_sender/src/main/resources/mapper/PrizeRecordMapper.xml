@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.prize_sender.mapper.PrizeRecordMapper">
+
+    <resultMap id="PrizeRecordMap"
+               type="com.example.prize_sender.entity.PrizeRecord">
+
+        <id property="id" column="id"/>
+
+        <result property="userId" column="user_id"/>
+
+        <result property="scene" column="scene"/>
+
+        <result property="code" column="code"/>
+
+        <result property="dateStr" column="date_str"/>
+
+        <result property="stage" column="stage"/>
+
+        <result property="amount" column="amount"/>
+
+        <result property="prizeTime" column="prize_time"/>
+
+        <result property="outBizNo" column="out_biz_no"/>
+
+    </resultMap>
+
+    <insert id="add">
+
+        insert into prize_record
+        (
+        user_id,
+        scene,
+        code,
+        date_str,
+        stage,
+        amount,
+        prize_time,
+        out_biz_no
+        )
+        values
+        (
+        #{userId},
+        #{scene},
+        #{code},
+        #{dateStr},
+        #{stage},
+        #{amount},
+        now(),
+        #{outBizNo}
+        )
+
+    </insert>
+
+    <delete id="delete">
+
+        delete
+        from prize_record
+        where id = #{id}
+
+    </delete>
+
+    <update id="modify">
+
+        update prize_record
+        set
+        user_id = #{userId},
+        scene = #{scene},
+        code = #{code},
+        date_str = #{dateStr},
+        stage = #{stage},
+        amount = #{amount},
+        prize_time = now(),
+        out_biz_no = #{outBizNo}
+        where id = #{id}
+
+    </update>
+
+    <select id="queryById"
+            resultMap="PrizeRecordMap">
+
+        select *
+        from prize_record
+        where id = #{id}
+
+    </select>
+
+    <select id="queryAll"
+            resultMap="PrizeRecordMap">
+
+        select *
+        from prize_record
+        where user_id = #{userId}
+        <if test="startTime != null">
+            and prize_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            and prize_time &lt;= #{endTime}
+        </if>
+
+        order by prize_time desc
+
+        limit #{startIndex}, #{pageSize}
+
+    </select>
+    <select id="queryByTime"
+            resultMap="PrizeRecordMap">
+
+        select *
+        from prize_record
+        where prize_time &gt;= #{startTime} and prize_time &lt;= #{endTime}
+        order by prize_time desc
+
+    </select>
+
+</mapper>

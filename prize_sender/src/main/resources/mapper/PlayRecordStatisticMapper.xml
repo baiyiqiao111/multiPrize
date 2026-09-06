@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.prize_sender.mapper.PlayRecordStatisticMapper">
+
+    <!-- 实体映射 -->
+    <resultMap id="PlayRecordStatisticMap"
+               type="com.example.prize_sender.entity.PlayRecordStatistic">
+
+        <id property="id" column="id"/>
+
+        <result property="userId"
+                column="user_id"/>
+
+        <result property="totalDuration"
+                column="total_duration"/>
+
+        <result property="playDate"
+                column="play_date"/>
+
+        <result property="lastSyncTime"
+                column="last_sync_time"/>
+
+    </resultMap>
+
+    <!-- 新增 -->
+    <insert id="add">
+
+        insert into play_record_statistic
+        (
+        user_id,
+        total_duration,
+        play_date,
+        last_sync_time
+        )
+
+        values
+        (
+        #{userId},
+        #{totalDuration},
+        #{playDate},
+        now()
+        )
+
+    </insert>
+
+    <!-- 删除 -->
+    <delete id="delete">
+
+        delete
+        from play_record_statistic
+        where id=#{id}
+
+    </delete>
+
+    <!-- 修改 -->
+    <update id="modify">
+
+        update play_record_statistic
+        set
+        total_duration=#{totalDuration},
+        last_sync_time=now()
+        where id=#{id}
+
+    </update>
+
+    <!-- 查询全部 -->
+    <select id="queryAll"
+            resultMap="PlayRecordStatisticMap">
+
+        select *
+        from play_record_statistic
+
+    </select>
+
+    <!-- 根据id查询 -->
+    <select id="queryById"
+            resultMap="PlayRecordStatisticMap">
+
+        select *
+        from play_record_statistic
+        where id=#{id}
+
+    </select>
+    <select id="queryByUserIdAndDate"
+            resultMap="PlayRecordStatisticMap">
+
+        select *
+        from play_record_statistic
+        where user_id=#{userId} and play_date = #{playDate}
+    </select>
+
+</mapper>

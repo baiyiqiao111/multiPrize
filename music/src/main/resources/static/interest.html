@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设置兴趣标签 · 音乐管理</title>
+  <link rel="stylesheet" href="css/qqmusic.css">
+  <script defer src="js/shell.js"></script>
+  <style>
+    /* 铺满：内容区纵向撑满，标签卡片占满整块区域 */
+    .qm-content.full { display: flex; flex-direction: column; }
+    .tag-card {
+      flex: 1; width: 100%; margin: 0; padding: 30px 32px; margin-bottom: 0;
+    }
+    .tag-card .logo {
+      width: 56px; height: 56px; margin: 0 auto; border-radius: 50%;
+      background: linear-gradient(135deg, #4fdc9a, var(--qm-green));
+      color: #fff; font-size: 25px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 18px rgba(49,194,124,.35);
+    }
+    .tag-card h1 { font-size: 20px; text-align: center; margin: 14px 0 4px; }
+    .tag-card .sub { text-align: center; color: var(--qm-text-3); font-size: 13px; margin-bottom: 26px; }
+    .tag-card .primary { display: block; width: 100%; max-width: 420px; margin: 6px auto 0; font-size: 15px; padding: 12px; }
+    .field { margin-bottom: 18px; }
+
+    /* 预设标签 */
+    .presets { display: flex; flex-wrap: wrap; gap: 8px; }
+    .preset {
+      cursor: pointer; user-select: none; font-size: 13px; padding: 6px 15px; border-radius: 999px;
+      border: 1px solid var(--qm-border); background: #fff; color: #5c6672; transition: .12s;
+    }
+    .preset:hover { border-color: var(--qm-green); color: var(--qm-green); }
+    .preset.active {
+      background: var(--qm-green); border-color: var(--qm-green); color: #fff;
+      box-shadow: 0 3px 10px rgba(49,194,124,.3);
+    }
+
+    /* 自定义输入 */
+    .add-row { display: flex; gap: 8px; }
+    .add-row input { flex: 1; }
+    .add-row button { padding: 0 20px; white-space: nowrap; }
+
+    /* 已选标签 chips */
+    .chips {
+      display: flex; flex-wrap: wrap; gap: 8px; min-height: 46px; padding: 9px;
+      border: 1px dashed #dde1e6; border-radius: 10px; background: var(--qm-hover);
+    }
+    .chips:empty::before { content: "尚未选择任何标签"; color: var(--qm-text-3); font-size: 13px; padding: 3px 4px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 5px 6px 5px 13px;
+      border-radius: 999px; background: var(--qm-green-soft); color: var(--qm-green-dark);
+    }
+    .chip .x {
+      cursor: pointer; width: 18px; height: 18px; line-height: 17px; text-align: center; border-radius: 50%;
+      background: rgba(38,167,104,.16); font-size: 14px;
+    }
+    .chip .x:hover { background: rgba(38,167,104,.32); }
+
+    .msg { font-size: 13px; min-height: 18px; margin-top: 12px; text-align: center; }
+    .msg.err { color: var(--qm-red); }
+    .msg.ok { color: var(--qm-green-dark); }
+  </style>
+</head>
+<body>
+  <main class="qm-main">
+    <header class="qm-top">
+      <a class="qm-back" href="music.html" title="返回音乐管理">←</a>
+      <div>
+        <h1>兴趣标签</h1>
+        <div class="sub">UserController · /user/interest</div>
+      </div>
+    </header>
+
+    <div class="qm-content full">
+  <div class="card tag-card">
+    <div class="logo">🏷️</div>
+    <h1>设置兴趣标签</h1>
+    <div class="sub">选择你喜欢的曲风，为你推荐更懂你的歌单</div>
+
+    <div class="field">
+      <label>用户 ID</label>
+      <input id="userId" type="number" min="1" placeholder="请输入用户 ID" />
+    </div>
+
+    <div class="field">
+      <label>推荐标签（点击选择 / 取消）</label>
+      <div class="presets" id="presets"></div>
+    </div>
+
+    <div class="field">
+      <label>自定义标签</label>
+      <div class="add-row">
+        <input id="customInput" placeholder="输入标签后回车或点击添加" maxlength="20" />
+        <button type="button" onclick="addCustom()">添加</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>已选标签</label>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <button class="primary" id="btn" onclick="submit()">保存标签</button>
+    <div class="msg" id="msg"></div>
+
+    <div class="foot" style="text-align:center;font-size:13px;margin-top:18px">
+      <a href="index.html">← 返回我的主页</a>
+    </div>
+  </div>
+    </div>
+  </main>
+
+  <script>
+    const API = "/user";
+    const PRESETS = ["流行", "摇滚", "民谣", "古典", "电子", "嘻哈", "爵士", "乡村", "金属", "R&B", "国风", "纯音乐"];
+
+    // 已选标签集合（保持顺序、去重）
+    const selected = [];
+
+    const $ = id => document.getElementById(id);
+
+    function setMsg(text, type) {
+      const el = $("msg");
+      el.textContent = text || "";
+      el.className = "msg" + (type ? " " + type : "");
+    }
+
+    // 渲染预设标签
+    function renderPresets() {
+      const box = $("presets");
+      box.innerHTML = "";
+      PRESETS.forEach(tag => {
+        const span = document.createElement("span");
+        span.className = "preset" + (selected.includes(tag) ? " active" : "");
+        span.textContent = tag;
+        span.onclick = () => toggleTag(tag);
+        box.appendChild(span);
+      });
+    }
+
+    // 渲染已选 chips
+    function renderChips() {
+      const box = $("chips");
+      box.innerHTML = "";
+      selected.forEach(tag => {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        const label = document.createElement("span");
+        label.textContent = tag;
+        const x = document.createElement("span");
+        x.className = "x";
+        x.textContent = "×";
+        x.title = "移除";
+        x.onclick = () => removeTag(tag);
+        chip.appendChild(label);
+        chip.appendChild(x);
+        box.appendChild(chip);
+      });
+    }
+
+    function refresh() { renderPresets(); renderChips(); }
+
+    function toggleTag(tag) {
+      const i = selected.indexOf(tag);
+      if (i >= 0) selected.splice(i, 1);
+      else selected.push(tag);
+      refresh();
+    }
+
+    function removeTag(tag) {
+      const i = selected.indexOf(tag);
+      if (i >= 0) selected.splice(i, 1);
+      refresh();
+    }
+
+    function addCustom() {
+      const input = $("customInput");
+      const tag = input.value.trim();
+      if (!tag) return;
+      if (tag.includes(",") || tag.includes("，")) return setMsg("标签中不能包含逗号", "err");
+      if (selected.includes(tag)) { setMsg("该标签已添加", "err"); input.value = ""; return; }
+      selected.push(tag);
+      input.value = "";
+      setMsg("");
+      refresh();
+    }
+
+    async function submit() {
+      const userId = $("userId").value.trim();
+      if (!userId) return setMsg("请输入用户 ID", "err");
+      if (selected.length === 0) return setMsg("请至少选择或输入一个标签", "err");
+
+      const interests = selected.join(",");
+      const btn = $("btn");
+      btn.disabled = true; btn.textContent = "保存中…"; setMsg("");
+
+      try {
+        // selectInterest(int userId, String interests) —— 普通请求参数，使用表单编码
+        const body = new URLSearchParams({ userId, interests });
+        const r = await fetch(`${API}/interest`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body
+        });
+        const data = await r.json();
+        if (data.success) {
+          setMsg("标签保存成功：" + interests, "ok");
+        } else {
+          setMsg(data.errorMessage || "保存失败", "err");
+        }
+      } catch (e) {
+        setMsg("请求失败：" + e.message, "err");
+      } finally {
+        btn.disabled = false; btn.textContent = "保存标签";
+      }
+    }
+
+    // 回车添加自定义标签
+    $("customInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); addCustom(); }
+    });
+
+    // 从 URL 读取 userId（由用户管理页跳转带入），并回填该用户已有标签
+    async function initFromQuery() {
+      const userId = new URLSearchParams(location.search).get("userId");
+      if (!userId) { refresh(); return; }
+      $("userId").value = userId;
+      try {
+        const r = await fetch(`${API}/id?id=${encodeURIComponent(userId)}`);
+        const data = await r.json();
+        const existing = data.userVo && data.userVo.interests;
+        if (existing) {
+          String(existing).split(/[,，]/).map(t => t.trim()).filter(Boolean)
+            .forEach(t => { if (!selected.includes(t)) selected.push(t); });
+        }
+      } catch (e) { /* 回填失败不阻塞页面 */ }
+      refresh();
+    }
+
+    initFromQuery();
+  </script>
+</body>
+</html>

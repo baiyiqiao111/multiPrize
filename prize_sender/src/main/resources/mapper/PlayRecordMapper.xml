@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.prize_sender.mapper.PlayRecordMapper">
+    <resultMap id="PlayRecordMap" type="com.example.prize_sender.entity.PlayRecord">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="musicId" column="music_id"/>
+        <result property="duration" column="duration"/>
+        <result property="syncTime" column="sync_time"/>
+    </resultMap>
+    <!-- 新增 -->
+    <insert id="add">
+        insert into play_record
+        (user_id,music_id,duration,sync_time)
+        values
+        (#{userId},
+        #{musicId},
+        #{duration},
+        now())
+    </insert>
+
+    <!-- 删除 -->
+    <delete id="delete">
+        delete
+        from play_record
+        where id=#{id}
+    </delete>
+
+    <!-- 修改 -->
+    <update id="modify">
+        update play_record
+        set
+        user_id=#{userId},
+        music_id=#{musicId},
+        duration=#{duration},
+        sync_time=#{syncTime}
+        where id=#{id}
+    </update>
+
+    <!-- 查询全部（时间范围可选） -->
+    <select id="queryAll" resultMap="PlayRecordMap">
+        select *
+        from play_record
+        where user_id=#{userId}
+        <if test="startTime != null">
+            and sync_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            and sync_time &lt;= #{endTime}
+        </if>
+        order by sync_time desc
+    </select>
+
+    <!-- 根据id查询 -->
+    <select id="queryById"
+            resultMap="PlayRecordMap">
+        select *
+        from play_record
+        where id=#{id}
+    </select>
+
+</mapper>

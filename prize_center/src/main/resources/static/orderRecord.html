@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>金币发放记录管理</title>
+  <link rel="stylesheet" href="css/qqmusic.css">
+  <script defer src="js/shell.js"></script>
+  <style>
+    .toolbar .field-inline { display: flex; align-items: center; gap: 6px; }
+    .toolbar .field-inline label { font-size: 13px; color: var(--qm-text-2); }
+    td.mono { font-family: "SFMono-Regular", Consolas, monospace; word-break: break-all; font-size: 13px; }
+    td.amount { font-weight: 600; color: #d98f0b; }
+    .coin { margin-right: 3px; }
+    .pager { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <main class="qm-main">
+    <header class="qm-top">
+      <a class="qm-back" href="javascript:backToMusic()" title="返回音乐">←</a>
+      <div>
+        <h1>🧾 金币发放记录</h1>
+        <div class="sub">OrderRecordController · /orderRecord</div>
+      </div>
+      <span class="spacer"></span>
+      <div class="acts">
+        <a class="icon-btn" href="prize.html" title="奖品中心" aria-label="奖品中心">🪙</a>
+      </div>
+    </header>
+
+    <div class="qm-content">
+      <!-- 查询工具栏 -->
+      <div class="card">
+        <div class="toolbar">
+          <input id="searchId" type="number" placeholder="按 ID 查询…" style="width:130px" />
+          <button class="ghost" onclick="searchById()">按 ID</button>
+          <input id="searchOutBizNo" placeholder="按外部业务号查询…" style="width:220px" />
+          <button class="ghost" onclick="searchByOutBizNo()">按业务号</button>
+        </div>
+        <div class="toolbar" style="margin-top:12px">
+          <div class="field-inline">
+            <label>开始时间</label>
+            <input id="statTime" type="datetime-local" />
+          </div>
+          <div class="field-inline">
+            <label>结束时间</label>
+            <input id="endTime" type="datetime-local" />
+          </div>
+          <button id="rangeQueryBtn" onclick="firstPage()">查询记录</button>
+          <button class="ghost" id="resetRangeBtn" onclick="resetRange()">重置时间</button>
+          <span id="rangeHint" style="font-size:12px;color:#d98f0b;display:none">已按 ID / 业务号查询，无需时间条件</span>
+          <span style="flex:1"></span>
+          <label style="font-size:13px;color:var(--qm-text-2)">每页</label>
+          <select id="pageSize" onchange="firstPage()">
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 记录表格 -->
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:70px">ID</th>
+              <th>外部业务号 OUT_BIZ_NO</th>
+              <th>券码 CODE</th>
+              <th style="width:110px">发放金币</th>
+              <th style="width:170px">发放时间</th>
+              <th style="width:90px;text-align:right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td colspan="6" class="empty">设置时间范围后点击「查询记录」加载数据</td></tr>
+          </tbody>
+        </table>
+        <div class="pager">
+          <button class="ghost small" id="prevBtn" onclick="prevPage()">上一页</button>
+          <span class="pn" id="pageNo">第 1 页</span>
+          <button class="ghost small" id="nextBtn" onclick="nextPage()">下一页</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+
+  <script>
+    const API = "/orderRecord";
+    let page = 1;
+
+    function backToMusic() {
+      // music 应用运行在 8080 端口
+      location.href = `http://${location.hostname}:8080/music.html`;
+    }
+
+    function toast(msg, ok = true) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "show " + (ok ? "ok" : "err");
+      setTimeout(() => (t.className = ""), 2200);
+    }
+
+    function fmtDate(d) {
+      if (!d) return "-";
+      const dt = new Date(d);
+      if (isNaN(dt)) return d;
+      const p = n => String(n).padStart(2, "0");
+      return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}:${p(dt.getSeconds())}`;
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+    }
+
+    // datetime-local 的值（yyyy-MM-ddTHH:mm）补齐秒后作为查询参数发给后端
+    function rangeValue(id) {
+      const v = document.getElementById(id).value;
+      if (!v) return "";
+      return v.length === 16 ? v + ":00" : v;   // 补齐秒，形如 2026-07-16T00:00:00
+    }
+
+    function render(list) {
+      const tb = document.getElementById("tbody");
+      if (!list || list.length === 0) {
+        tb.innerHTML = '<tr><td colspan="6" class="empty">没有匹配的发放记录</td></tr>';
+        return;
+      }
+      tb.innerHTML = list.map(o => `
+        <tr>
+          <td>${o.id}</td>
+          <td class="mono">${esc(o.outBizNo)}</td>
+          <td class="mono">${esc(o.code)}</td>
+          <td class="amount"><span class="coin">🪙</span>${o.amount}</td>
+          <td>${fmtDate(o.prizeTime)}</td>
+          <td style="text-align:right">
+            <button class="danger small" onclick="removeRecord(${o.id}, '${esc(o.outBizNo)}')">删除</button>
+          </td>
+        </tr>`).join("");
+    }
+
+    function setPager(show) {
+      document.getElementById("prevBtn").disabled = !show || page <= 1;
+      document.getElementById("nextBtn").disabled = !show;
+      document.getElementById("pageNo").textContent = show ? `第 ${page} 页` : "查询结果";
+    }
+
+    // ---------- 分页 + 时间范围查询 ----------
+    function firstPage() { page = 1; loadPage(); }
+    function prevPage() { if (page > 1) { page--; loadPage(); } }
+    function nextPage() { page++; loadPage(); }
+
+    async function loadPage() {
+      const tb = document.getElementById("tbody");
+      tb.innerHTML = '<tr><td colspan="6" class="empty">加载中…</td></tr>';
+      const size = parseInt(document.getElementById("pageSize").value, 10);
+      const startIndex = (page - 1) * size;   // 后端 limit startIndex,size 为偏移量
+
+      const params = new URLSearchParams({ startIndex, size });
+      const statTime = rangeValue("statTime");
+      const endTime = rangeValue("endTime");
+      if (statTime) params.append("statTime", statTime);
+      if (endTime) params.append("endTime", endTime);
+
+      try {
+        const r = await fetch(`${API}/all?${params.toString()}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) {
+          render([]); setPager(false);
+          return toast(data.baseVo.errorMessage || "加载失败", false);
+        }
+        const list = data.orderRecordVoList || [];
+        if (!list.length && page > 1) { page--; return toast("已经是最后一页", false); }
+        render(list);
+        setPager(true);
+        document.getElementById("nextBtn").disabled = list.length < size;
+      } catch (e) {
+        render([]); setPager(false);
+        toast("请求失败: " + e.message, false);
+      }
+    }
+
+    async function searchById() {
+      const id = document.getElementById("searchId").value.trim();
+      if (!id) return firstPage();
+      const tb = document.getElementById("tbody");
+      tb.innerHTML = '<tr><td colspan="6" class="empty">查询中…</td></tr>';
+      try {
+        const r = await fetch(`${API}/id?id=${encodeURIComponent(id)}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) {
+          render([]); setPager(false);
+          return toast(data.baseVo.errorMessage || "未找到", false);
+        }
+        render(data.orderRecordVo ? [data.orderRecordVo] : []);
+        setPager(false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function searchByOutBizNo() {
+      const outBizNo = document.getElementById("searchOutBizNo").value.trim();
+      if (!outBizNo) return firstPage();
+      const tb = document.getElementById("tbody");
+      tb.innerHTML = '<tr><td colspan="6" class="empty">查询中…</td></tr>';
+      try {
+        const r = await fetch(`${API}/outBizNo?outBizNo=${encodeURIComponent(outBizNo)}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) {
+          render([]); setPager(false);
+          return toast(data.baseVo.errorMessage || "未找到", false);
+        }
+        render(data.orderRecordVo ? [data.orderRecordVo] : []);
+        setPager(false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    function resetRange() {
+      document.getElementById("statTime").value = "";
+      document.getElementById("endTime").value = "";
+    }
+
+    async function removeRecord(id, outBizNo) {
+      if (!confirm(`确认删除发放记录 (ID: ${id}，业务号: ${outBizNo})？`)) return;
+      try {
+        const r = await fetch(`${API}/delete?id=${id}`, { method: "DELETE" });
+        const data = await r.json();
+        if (data.success) { toast("删除成功"); loadPage(); }
+        else toast(data.errorMessage || "删除失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // 按 ID / 业务号查询时不需要时间条件：任一有输入即禁用时间范围控件
+    function syncQueryMode() {
+      const byKey = !!(document.getElementById("searchId").value.trim()
+        || document.getElementById("searchOutBizNo").value.trim());
+      ["statTime", "endTime", "rangeQueryBtn", "resetRangeBtn"].forEach(id => {
+        document.getElementById(id).disabled = byKey;
+      });
+      document.getElementById("rangeHint").style.display = byKey ? "" : "none";
+    }
+
+    // 回车触发对应查询
+    document.getElementById("searchId").addEventListener("keydown", e => { if (e.key === "Enter") searchById(); });
+    document.getElementById("searchOutBizNo").addEventListener("keydown", e => { if (e.key === "Enter") searchByOutBizNo(); });
+    // 输入 ID / 业务号时联动禁用时间条件
+    document.getElementById("searchId").addEventListener("input", syncQueryMode);
+    document.getElementById("searchOutBizNo").addEventListener("input", syncQueryMode);
+
+    // 默认时间范围：最近 30 天 → 现在，方便直接查询
+    (function initRange() {
+      const now = new Date();
+      const from = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+      const p = n => String(n).padStart(2, "0");
+      const toLocal = d => `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+      document.getElementById("statTime").value = toLocal(from);
+      document.getElementById("endTime").value = toLocal(now);
+      firstPage();
+    })();
+  </script>
+</body>
+</html>

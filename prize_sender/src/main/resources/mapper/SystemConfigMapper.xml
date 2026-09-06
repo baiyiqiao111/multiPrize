@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.prize_sender.mapper.SystemConfigMapper">
+
+    <!-- 实体映射 -->
+    <resultMap id="SystemConfigMap" type="com.example.prize_sender.entity.SystemConfig">
+        <id property="id" column="id"/>
+        <result property="code" column="code"/>
+        <result property="value" column="value"/>
+    </resultMap>
+
+    <!-- 新增 -->
+    <insert id="add" parameterType="com.example.prize_sender.entity.SystemConfig">
+        INSERT INTO system_config
+        (
+        code,
+        value
+        )
+        VALUES
+        (
+        #{code},
+        #{value}
+        )
+    </insert>
+
+    <!-- 删除 -->
+    <delete id="delete" parameterType="int">
+        DELETE
+        FROM system_config
+        WHERE id = #{id}
+    </delete>
+
+    <!-- 修改 -->
+    <update id="modify" parameterType="com.example.prize_sender.entity.SystemConfig">
+        UPDATE system_config
+        SET
+        code = #{code},
+        value = #{value}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID查询 -->
+    <select id="queryById"
+            parameterType="int"
+            resultMap="SystemConfigMap">
+        SELECT
+        id,
+        code,
+        value
+        FROM system_config
+        WHERE id = #{id}
+    </select>
+
+    <!-- 根据code查询 -->
+    <select id="queryByCode"
+            parameterType="string"
+            resultMap="SystemConfigMap">
+        SELECT
+        id,
+        code,
+        value
+        FROM system_config
+        WHERE code = #{code}
+    </select>
+
+    <!-- 分页查询 -->
+    <select id="queryAll"
+            resultMap="SystemConfigMap">
+        SELECT
+        id,
+        code,
+        value
+        FROM system_config
+        ORDER BY id
+        LIMIT #{start}, #{size}
+    </select>
+
+</mapper>

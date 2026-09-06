@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>音乐详情</title>
+  <script>
+    // 登录守卫：未登录跳转登录页
+    if (!sessionStorage.getItem("musicUser")) location.replace("login.html");
+  </script>
+  <link rel="stylesheet" href="css/qqmusic.css">
+  <script defer src="js/shell.js"></script>
+  <style>
+    /* ---------- 歌曲信息区 ---------- */
+    #card { padding: 28px; }
+    .detail { display: flex; gap: 28px; flex-wrap: wrap; }
+    .cover {
+      width: 240px; height: 240px; object-fit: cover; border-radius: 14px; flex-shrink: 0;
+      background: #eef0f2; box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    }
+    .cover.ph {
+      display: flex; align-items: center; justify-content: center; font-size: 76px; color: #cbd1d7;
+      background: linear-gradient(135deg, #f2f4f6, #e4e8ec);
+    }
+    .info { flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 10px; }
+    .info h1 { font-size: 25px; font-weight: 700; }
+    .info .author { font-size: 15px; color: var(--qm-text-2); }
+    .tag { font-size: 12px; padding: 3px 11px; }
+    .meta { font-size: 12px; color: var(--qm-text-3); }
+    .audio-wrap { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+
+    .like-line { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+    .like-btn { background: #fff; color: var(--qm-red); border: 1px solid #ffd6d6; padding: 7px 20px; }
+    .like-btn:hover { background: var(--qm-red-soft); }
+    .like-btn.liked { background: var(--qm-red); color: #fff; border-color: var(--qm-red); }
+    .like-users { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 2px; }
+    .like-users-label { font-size: 12px; color: var(--qm-text-2); }
+    .like-user { font-size: 12px; background: var(--qm-red-soft); color: var(--qm-red); padding: 2px 10px; border-radius: 999px; }
+
+    .section { margin-top: 26px; }
+    .section h3 { font-size: 13px; color: var(--qm-text-2); margin-bottom: 8px; }
+    .content { font-size: 14px; line-height: 1.8; color: #5c6672; white-space: pre-wrap; }
+    .actions { margin-top: 26px; display: flex; gap: 10px; }
+
+    /* ---------- 评论区 ---------- */
+    #commentsCard h3.title { font-size: 16px; margin-bottom: 16px; }
+    .comment-box { display: flex; flex-direction: column; gap: 10px; }
+    .comment-box textarea { width: 100%; min-height: 76px; resize: vertical; line-height: 1.6; }
+    .comment-box .row { display: flex; justify-content: flex-end; gap: 10px; }
+    .comment-list { margin-top: 18px; display: flex; flex-direction: column; gap: 14px; }
+    .comment-item { border-top: 1px solid var(--qm-border); padding-top: 14px; }
+    .comment-item.comment-highlight { animation: cmtFlash 2.5s ease; border-radius: 8px; }
+    @keyframes cmtFlash {
+      0%, 45% { background: var(--qm-green-soft); box-shadow: 0 0 0 8px var(--qm-green-soft); }
+      100% { background: transparent; box-shadow: 0 0 0 8px transparent; }
+    }
+    .comment-head { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+    .comment-head .avatar {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; font-weight: 700;
+      background: var(--qm-green-soft); color: var(--qm-green-dark);
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .comment-head .name { font-weight: 600; font-size: 14px; }
+    .comment-head .time { margin-left: auto; font-size: 12px; color: var(--qm-text-3); }
+    .comment-text { font-size: 14px; line-height: 1.7; color: #5c6672; white-space: pre-wrap; }
+    .comment-actions { margin-top: 7px; display: flex; gap: 16px; }
+    .comment-actions a { font-size: 12px; color: var(--qm-text-2); cursor: pointer; }
+    .comment-actions a:hover { color: var(--qm-green); }
+    .replies {
+      margin-top: 12px; margin-left: 41px; padding-left: 14px;
+      display: flex; flex-direction: column; gap: 14px; border-left: 2px solid var(--qm-border);
+    }
+    .reply-form { margin-top: 10px; margin-left: 41px; }
+    .empty-comments { color: var(--qm-text-3); font-size: 14px; padding: 12px 0; }
+  </style>
+</head>
+<body>
+  <main class="qm-main">
+    <header class="qm-top">
+      <a class="qm-back" href="music.html" title="返回列表">←</a>
+      <div>
+        <h1>歌曲详情</h1>
+        <div class="sub">MusicController · /music</div>
+      </div>
+    </header>
+
+    <div class="qm-content narrow">
+      <div class="card" id="card">
+        <div class="state">加载中…</div>
+      </div>
+
+      <!-- 评论区 -->
+      <div class="card" id="commentsCard">
+        <h3 class="title">评论 <span id="commentCount"></span></h3>
+        <div class="comment-box">
+          <textarea id="newComment" placeholder="说点什么吧…"></textarea>
+          <div class="row"><button onclick="postComment()">发表评论</button></div>
+        </div>
+        <div class="comment-list" id="commentList">
+          <div class="empty-comments">加载中…</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 编辑弹窗 -->
+  <div class="mask" id="mask">
+    <div class="modal">
+      <h3>编辑音乐</h3>
+      <input type="hidden" id="f_id" />
+      <input type="hidden" id="f_publishTime" />
+      <div class="field"><label>标题</label><input id="f_title" /></div>
+      <div class="field"><label>歌手</label><input id="f_author" /></div>
+      <div class="field"><label>简介</label><textarea id="f_content"></textarea></div>
+      <div class="field"><label>标签（逗号分隔）</label><input id="f_tags" placeholder="流行, 华语, 经典" /></div>
+      <div class="field"><label>封面图 URL</label><input id="f_pictureUrl" /></div>
+      <div class="field"><label>音频 URL</label><input id="f_soundUrl" /></div>
+      <div class="modal-actions">
+        <button class="ghost" onclick="closeModal()">取消</button>
+        <button onclick="submitForm()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const API = "/music";
+    const id = new URLSearchParams(location.search).get("id");
+    const targetCommentId = new URLSearchParams(location.search).get("commentId");
+    let current = null;
+
+    function toast(msg, ok = true) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "show " + (ok ? "ok" : "err");
+      setTimeout(() => (t.className = ""), 2200);
+    }
+
+    function fmtDate(d) {
+      if (!d) return "-";
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return d;
+      const p = n => String(n).padStart(2, "0");
+      return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+    }
+
+    function tagList(tags) {
+      if (!tags) return "";
+      const arr = String(tags).split(/[,，;；\s]+/).filter(Boolean);
+      if (!arr.length) return "";
+      return `<div class="tags">${arr.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>`;
+    }
+
+    // 秒 -> mm:ss
+    function fmtDur(sec) {
+      if (!isFinite(sec) || sec <= 0) return "--:--";
+      const s = Math.round(sec);
+      const p = n => String(n).padStart(2, "0");
+      return `${p(Math.floor(s / 60))}:${p(s % 60)}`;
+    }
+
+    // 音频元数据加载完成后，把实际时长写入相邻的时长标签
+    function showDur(a) {
+      const el = a.parentElement && a.parentElement.querySelector(".dur");
+      if (el) el.textContent = "时长 " + fmtDur(a.duration);
+    }
+
+    function render(m) {
+      current = m;
+      document.title = m.title + " - 音乐详情";
+      const coverHtml = m.pictureUrl
+        ? `<img class="cover" src="${esc(m.pictureUrl)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cover ph',textContent:'♪'}))">`
+        : `<div class="cover ph">♪</div>`;
+      document.getElementById("card").innerHTML = `
+        <div class="detail">
+          ${coverHtml}
+          <div class="info">
+            <h1>${esc(m.title)}</h1>
+            <div class="author">${esc(m.author) || "未知歌手"}</div>
+            ${tagList(m.tags)}
+            ${m.soundUrl ? `<div class="audio-wrap"><audio controls preload="metadata" src="${esc(m.soundUrl)}" onloadedmetadata="showDur(this)"></audio><span class="meta dur">时长 --:--</span></div>` : '<div class="meta">暂无音频</div>'}
+            <div class="meta">ID #${m.id} · 发布于 ${fmtDate(m.publishTime)}</div>
+            <div class="like-line">
+              <button class="like-btn" id="likeBtn" onclick="toggleLike()">🤍 点赞</button>
+              <span class="meta" id="likeCount"></span>
+            </div>
+            <div class="like-users" id="likeUsers"></div>
+          </div>
+        </div>
+        ${m.content ? `<div class="section"><h3>简介</h3><div class="content">${esc(m.content)}</div></div>` : ""}
+        <div class="actions">
+          <button onclick="openEdit()">编辑</button>
+          <button class="danger" onclick="removeMusic()">删除</button>
+        </div>`;
+      // 详情渲染后绑定播放上报（音频元素由上面的模板生成）
+      bindPlaySync(document.querySelector("#card audio"));
+    }
+
+    async function load() {
+      if (!id) {
+        document.getElementById("card").innerHTML = '<div class="state">缺少音乐 ID 参数</div>';
+        return;
+      }
+      try {
+        const r = await fetch(`${API}/id?id=${encodeURIComponent(id)}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) {
+          document.getElementById("card").innerHTML =
+            `<div class="state">${esc(data.baseVo.errorMessage || "音乐不存在")}</div>`;
+          return;
+        }
+        if (!data.musicVo) {
+          document.getElementById("card").innerHTML = '<div class="state">音乐不存在</div>';
+          return;
+        }
+        render(data.musicVo);
+      } catch (e) {
+        document.getElementById("card").innerHTML = `<div class="state">请求失败：${esc(e.message)}</div>`;
+      }
+    }
+
+    // ---------- 播放时长同步上报（基于 prize_sender 的 SyncController，运行在 8085 端口） ----------
+    const SYNC_API = `http://${location.hostname}:8085/sync`;
+    const SYNC_INTERVAL_MS = 30000;   // 每 30 秒上报一次
+    const SYNC_DURATION = 30;         // 每次上报的播放时长（秒）
+    const SYNC_SCENE = "PLAY_MUSIC";  // 发奖场景，默认播放音乐
+    const SYNC_PRIZE_CODE = "COIN";   // 奖品码，默认金币
+    let syncTimer = null;
+
+    // 上报一次播放记录：调用 SyncController 的 /sync/sync
+    async function play() {
+      if (currentUserId == null || !id) return;   // 用户未识别或缺少音乐 id 时不上报
+      const params = new URLSearchParams({
+        userId: currentUserId,
+        musicId: id,
+        duration: SYNC_DURATION,
+        scene: SYNC_SCENE,
+        prizeCode: SYNC_PRIZE_CODE
+      });
+      try {
+        await fetch(`${SYNC_API}/sync?${params.toString()}`, { method: "POST" });
+      } catch (e) { /* 上报失败不打断播放体验 */ }
+    }
+
+    // 绑定音频播放事件：播放中每 30s 调用一次 play，暂停 / 结束 / 离开页面时停止
+    function bindPlaySync(audio) {
+      const stop = () => { clearInterval(syncTimer); syncTimer = null; };
+      stop();   // 重新渲染（如编辑后）时先清掉可能遗留的计时器
+      if (!audio) return;
+      const start = () => { if (!syncTimer) syncTimer = setInterval(play, SYNC_INTERVAL_MS); };
+      audio.addEventListener("play", start);
+      audio.addEventListener("pause", stop);
+      audio.addEventListener("ended", stop);
+      window.addEventListener("beforeunload", stop);
+    }
+
+    // ---------- 编辑 / 删除 ----------
+    const FIELDS = ["id", "title", "author", "content", "tags", "pictureUrl", "soundUrl", "publishTime"];
+
+    function openEdit() {
+      FIELDS.forEach(f => document.getElementById("f_" + f).value = current[f] ?? "");
+      document.getElementById("mask").classList.add("show");
+    }
+
+    function closeModal() { document.getElementById("mask").classList.remove("show"); }
+
+    async function submitForm() {
+      const payload = {
+        id: parseInt(document.getElementById("f_id").value, 10),
+        title: document.getElementById("f_title").value.trim(),
+        author: document.getElementById("f_author").value.trim(),
+        content: document.getElementById("f_content").value.trim(),
+        tags: document.getElementById("f_tags").value.trim(),
+        pictureUrl: document.getElementById("f_pictureUrl").value.trim(),
+        soundUrl: document.getElementById("f_soundUrl").value.trim()
+      };
+      if (!payload.title) return toast("标题不能为空", false);
+      const pt = document.getElementById("f_publishTime").value;
+      if (pt) payload.publishTime = pt;
+
+      try {
+        const r = await fetch(`${API}/modify`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await r.json();
+        if (data.success) { toast("修改成功"); closeModal(); load(); }
+        else toast(data.errorMessage || "操作失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function removeMusic() {
+      if (!confirm(`确认删除音乐「${current.title}」(ID: ${current.id})？`)) return;
+      try {
+        const r = await fetch(`${API}/delete?id=${current.id}`, { method: "DELETE" });
+        const data = await r.json();
+        if (data.success) { toast("删除成功，即将返回列表"); setTimeout(() => location.href = "music.html", 800); }
+        else toast(data.errorMessage || "删除失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // ---------- 评论区 ----------
+    const userName = sessionStorage.getItem("musicUser");
+    let currentUserId = null;   // 当前登录用户 id
+    const userMap = {};         // userId -> name
+    let commentsCache = [];      // 当前音乐的全部评论
+
+    // 拉取用户列表：构建 id->名字 映射，并解析当前登录用户的 id
+    async function loadUsers() {
+      try {
+        const r = await fetch("/user/all");
+        const data = await r.json();
+        (data.userVoList || []).forEach(u => { userMap[u.id] = u.name; });
+        const me = (data.userVoList || []).find(u => u.name === userName);
+        if (me) currentUserId = me.id;
+      } catch (e) { /* 用户名解析失败时仅影响发表，不阻断浏览 */ }
+    }
+
+    async function loadComments() {
+      try {
+        const r = await fetch(`/comment/by-music?musicId=${encodeURIComponent(id)}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) {
+          document.getElementById("commentList").innerHTML =
+            `<div class="empty-comments">${esc(data.baseVo.errorMessage || "评论加载失败")}</div>`;
+          return;
+        }
+        commentsCache = data.commentVoList || [];
+        renderComments(commentsCache);
+        highlightTargetComment();
+      } catch (e) {
+        document.getElementById("commentList").innerHTML =
+          `<div class="empty-comments">评论加载失败：${esc(e.message)}</div>`;
+      }
+    }
+
+    // 从通知跳转而来时，滚动到目标评论并高亮
+    function highlightTargetComment() {
+      if (!targetCommentId) return;
+      const el = document.querySelector(`.comment-item[data-id="${targetCommentId}"]`);
+      if (!el) { toast("对应评论不存在或已删除", false); return; }
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("comment-highlight");
+      setTimeout(() => el.classList.remove("comment-highlight"), 2600);
+    }
+
+    function renderComments(list) {
+      const wrap = document.getElementById("commentList");
+      document.getElementById("commentCount").textContent = list.length ? `(${list.length})` : "";
+      if (!list.length) {
+        wrap.innerHTML = '<div class="empty-comments">还没有评论，快来抢沙发～</div>';
+        return;
+      }
+
+      // 按 parentId 分组，支持楼中楼回复
+      const byParent = {};
+      list.forEach(c => { (byParent[c.parentId] = byParent[c.parentId] || []).push(c); });
+
+      function nodeHtml(c) {
+        const name = userMap[c.userId] || ("用户" + c.userId);
+        const mine = c.userId === currentUserId;
+        const children = byParent[c.id] || [];
+        return `<div class="comment-item" data-id="${c.id}">
+          <div class="comment-head">
+            <div class="avatar">${esc((name || "?").charAt(0).toUpperCase())}</div>
+            <span class="name">${esc(name)}</span>
+            <span class="time">${fmtDate(c.publishTime)}</span>
+          </div>
+          <div class="comment-text">${esc(c.comment)}</div>
+          <div class="comment-actions">
+            <a onclick="toggleReply(${c.id})">回复</a>
+            ${mine ? `<a onclick="editComment(${c.id})">编辑</a><a onclick="removeComment(${c.id})">删除</a>` : ""}
+          </div>
+          <div class="reply-form" id="reply_${c.id}" style="display:none;">
+            <div class="comment-box">
+              <textarea id="replyText_${c.id}" placeholder="回复 ${esc(name)}…"></textarea>
+              <div class="row">
+                <button class="ghost" onclick="toggleReply(${c.id})">取消</button>
+                <button onclick="submitReply(${c.id})">回复</button>
+              </div>
+            </div>
+          </div>
+          ${children.length ? `<div class="replies">${children.map(nodeHtml).join("")}</div>` : ""}
+        </div>`;
+      }
+
+      const tops = byParent[0] || [];
+      wrap.innerHTML = tops.map(nodeHtml).join("");
+    }
+
+    function toggleReply(cid) {
+      const el = document.getElementById("reply_" + cid);
+      const show = el.style.display === "none";
+      el.style.display = show ? "block" : "none";
+      if (show) document.getElementById("replyText_" + cid).focus();
+    }
+
+    async function addComment(text, parentId) {
+      if (!currentUserId) return toast("无法识别当前用户，请重新登录", false);
+      try {
+        const r = await fetch("/comment/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: currentUserId,
+            musicId: parseInt(id, 10),
+            parentId: parentId,
+            comment: text
+          })
+        });
+        const data = await r.json();
+        if (data.success) { toast("评论成功"); loadComments(); return true; }
+        toast(data.errorMessage || "评论失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+      return false;
+    }
+
+    async function postComment() {
+      const ta = document.getElementById("newComment");
+      const text = ta.value.trim();
+      if (!text) return toast("评论不能为空", false);
+      if (await addComment(text, 0)) ta.value = "";
+    }
+
+    async function submitReply(parentId) {
+      const ta = document.getElementById("replyText_" + parentId);
+      const text = ta.value.trim();
+      if (!text) return toast("回复不能为空", false);
+      await addComment(text, parentId);
+    }
+
+    async function editComment(cid) {
+      const c = commentsCache.find(x => x.id === cid);
+      const text = prompt("编辑评论", c ? c.comment : "");
+      if (text === null) return;
+      if (!text.trim()) return toast("评论不能为空", false);
+      try {
+        const r = await fetch(`/comment/modify?id=${cid}&comment=${encodeURIComponent(text.trim())}`,
+          { method: "PUT" });
+        const data = await r.json();
+        if (data.success) { toast("修改成功"); loadComments(); }
+        else toast(data.errorMessage || "操作失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function removeComment(cid) {
+      if (!confirm("确认删除这条评论？")) return;
+      try {
+        const r = await fetch(`/comment/delete?id=${cid}`, { method: "DELETE" });
+        const data = await r.json();
+        if (data.success) { toast("删除成功"); loadComments(); }
+        else toast(data.errorMessage || "删除失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // ---------- 点赞 ----------
+    let isLiked = false;
+    let likeCountNum = 0;
+    let likeUsers = [];   // 点赞当前音乐的用户列表
+
+    function renderLikeBtn() {
+      const btn = document.getElementById("likeBtn");
+      const cnt = document.getElementById("likeCount");
+      if (btn) {
+        btn.textContent = isLiked ? "❤️ 已赞" : "🤍 点赞";
+        btn.classList.toggle("liked", isLiked);
+      }
+      if (cnt) cnt.textContent = likeCountNum > 0 ? `${likeCountNum} 人点赞` : "暂无点赞";
+    }
+
+    function renderLikeUsers() {
+      const box = document.getElementById("likeUsers");
+      if (!box) return;
+      if (!likeUsers.length) { box.innerHTML = ""; return; }
+      box.innerHTML = `<span class="like-users-label">点赞用户：</span>` +
+        likeUsers.map(u => `<span class="like-user">${esc(u.name)}</span>`).join("");
+    }
+
+    async function loadLike() {
+      if (!document.getElementById("likeBtn")) return;
+      try {
+        const r = await fetch(`/like/music?musicId=${encodeURIComponent(id)}`);
+        const d = await r.json();
+        likeUsers = d.userVoList || [];
+        likeCountNum = likeUsers.length;
+        isLiked = currentUserId != null && likeUsers.some(u => u.id === currentUserId);
+      } catch (e) { /* 保持默认态 */ }
+      renderLikeBtn();
+      renderLikeUsers();
+    }
+
+    async function toggleLike() {
+      if (!currentUserId) return toast("无法识别当前用户，请重新登录", false);
+      const btn = document.getElementById("likeBtn");
+      const wasLiked = isLiked;
+      const url = `/like/${wasLiked ? "delete" : "add"}?userId=${currentUserId}&musicId=${encodeURIComponent(id)}`;
+      if (btn) btn.disabled = true;
+      try {
+        const r = await fetch(url, { method: wasLiked ? "DELETE" : "POST" });
+        const data = await r.json();
+        if (data.success) {
+          await loadLike();
+          toast(wasLiked ? "已取消点赞" : "点赞成功");
+        } else {
+          toast(data.errorMessage || "操作失败", false);
+        }
+      } catch (e) {
+        toast("请求失败: " + e.message, false);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    (async function init() {
+      await loadUsers();     // 解析当前用户 id 及 id->名字映射
+      await load();          // 渲染音乐详情（生成点赞按钮）
+      if (!id) { document.getElementById("commentsCard").style.display = "none"; return; }
+      await loadLike();      // 按钮已存在、用户 id 已知，加载点赞状态
+      await loadComments();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统通知</title>
+  <script>
+    // 登录守卫：未登录跳转登录页
+    if (!sessionStorage.getItem("musicUser")) location.replace("login.html");
+  </script>
+  <link rel="stylesheet" href="css/qqmusic.css">
+  <script defer src="js/shell.js"></script>
+  <style>
+    /* 铺满：内容区纵向撑满，通知卡片占满剩余高度 */
+    .qm-content.full { display: flex; flex-direction: column; }
+    #card { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; }
+    #card .state { margin: auto; }
+    .item {
+      display: flex; align-items: flex-start; gap: 12px; padding: 14px 20px;
+      border-bottom: 1px solid var(--qm-border); transition: .12s;
+    }
+    .item:last-child { border-bottom: none; }
+    .item:hover { background: var(--qm-hover); }
+    .item.unread { background: var(--qm-green-soft); }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%; background: transparent; margin-top: 7px; flex-shrink: 0;
+    }
+    .item.unread .dot { background: var(--qm-green); box-shadow: 0 0 0 3px rgba(49,194,124,.18); }
+    .body { flex: 1; min-width: 0; cursor: pointer; }
+    .body:hover .text { color: var(--qm-green); }
+    .text { font-size: 14px; line-height: 1.5; }
+    .time { font-size: 12px; color: var(--qm-text-3); margin-top: 3px; }
+    .del { background: none; color: #cfd4da; font-size: 18px; padding: 0 6px; flex-shrink: 0; border-radius: 6px; }
+    .del:hover { background: var(--qm-red-soft); color: var(--qm-red); }
+    .pager { margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <main class="qm-main">
+    <header class="qm-top">
+      <a class="qm-back" href="music.html" title="返回音乐管理">←</a>
+      <div>
+        <h1>系统通知</h1>
+        <div class="sub">NotificationController · /notification</div>
+      </div>
+    </header>
+
+    <div class="qm-content full">
+      <div class="card flush" id="card">
+        <div class="state">加载中…</div>
+      </div>
+
+      <div class="pager" id="pagerBox" style="display:none">
+        <button class="ghost" id="prevBtn" onclick="prevPage()">上一页</button>
+        <span class="pn" id="pageNo">第 1 页</span>
+        <button class="ghost" id="nextBtn" onclick="nextPage()">下一页</button>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+
+  <script>
+    const PAGE_SIZE = 10;
+    let pageNum = 1;
+    let currentUserId = null;
+    const userMap = {};   // id -> 名字
+
+    function toast(msg, ok = true) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "show " + (ok ? "ok" : "err");
+      setTimeout(() => (t.className = ""), 2200);
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+    }
+
+    function fmtDate(d) {
+      if (!d) return "-";
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return d;
+      const p = n => String(n).padStart(2, "0");
+      return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+    }
+
+    // 已读进度（与 music.html 铃铛角标共用同一 localStorage key）
+    function notifKey() { return "music_notif_read_" + (currentUserId != null ? currentUserId : "anon"); }
+    function getLastReadId() { return parseInt(localStorage.getItem(notifKey()) || "0", 10); }
+    function setLastReadId(v) { localStorage.setItem(notifKey(), String(v)); }
+
+    function notifText(n) {
+      const who = userMap[n.fromId] || ("用户 #" + n.fromId);
+      const opMap = { like: "点赞了", comment: "评论了", reply: "回复了", follow: "关注了" };
+      const typeMap = { music: "音乐", comment: "评论" };
+      const op = opMap[n.operation] || (n.operation || "更新了");
+      const type = typeMap[n.contentType] || n.contentType || "";
+      return `${esc(who)} ${op}${type ? " 你的" + type : ""}`;
+    }
+
+    async function resolveUser() {
+      const name = sessionStorage.getItem("musicUser");
+      try {
+        const r = await fetch("/user/all");
+        const d = await r.json();
+        const users = d.userVoList || [];
+        users.forEach(u => { userMap[u.id] = u.name; });
+        const me = users.find(u => u.name === name);
+        if (me) currentUserId = me.id;
+      } catch (e) { /* 名字解析失败则回退为 用户#id */ }
+    }
+
+    let lastLoaded = [];
+
+    async function load() {
+      if (currentUserId == null) {
+        document.getElementById("card").innerHTML = '<div class="state">无法识别当前用户，请重新登录</div>';
+        return;
+      }
+      document.getElementById("card").innerHTML = '<div class="state">加载中…</div>';
+      try {
+        const r = await fetch(`/notification/all?toId=${currentUserId}&pageNum=${pageNum}&pageSize=${PAGE_SIZE}`);
+        const d = await r.json();
+        if (d.baseVo && !d.baseVo.success) {
+          document.getElementById("card").innerHTML =
+            `<div class="state">${esc(d.baseVo.errorMessage || "加载失败")}</div>`;
+          return;
+        }
+        lastLoaded = d.notificationVoList || [];
+        render(lastLoaded);
+
+        // 进入页面视为已读：把已读进度推进到已见的最大通知 id
+        if (lastLoaded.length) {
+          const maxId = lastLoaded.reduce((m, n) => Math.max(m, n.id), getLastReadId());
+          setLastReadId(maxId);
+        }
+      } catch (e) {
+        document.getElementById("card").innerHTML = `<div class="state">请求失败：${esc(e.message)}</div>`;
+      }
+    }
+
+    function render(list) {
+      const box = document.getElementById("card");
+      const pager = document.getElementById("pagerBox");
+      if (!list.length) {
+        box.innerHTML = pageNum > 1
+          ? '<div class="state">没有更多通知了</div>'
+          : '<div class="state">暂无系统通知</div>';
+      } else {
+        const last = getLastReadId();
+        box.innerHTML = list.map(n => `
+          <div class="item ${n.id > last ? "unread" : ""}">
+            <span class="dot"></span>
+            <div class="body" onclick="openNotif(${n.id})" title="点击查看">
+              <div class="text">${notifText(n)}</div>
+              <div class="time">${fmtDate(n.operationTime)}</div>
+            </div>
+            <button class="del" title="删除" onclick="removeNotif(${n.id})">×</button>
+          </div>`).join("");
+      }
+      // 分页：非首页或本页已满时显示翻页
+      const showPager = pageNum > 1 || list.length >= PAGE_SIZE;
+      pager.style.display = showPager ? "" : "none";
+      document.getElementById("pageNo").textContent = `第 ${pageNum} 页`;
+      document.getElementById("prevBtn").disabled = pageNum <= 1;
+      document.getElementById("nextBtn").disabled = list.length < PAGE_SIZE;
+    }
+
+    function prevPage() { if (pageNum > 1) { pageNum--; load(); } }
+    function nextPage() { pageNum++; load(); }
+
+    // 点击通知：跳转到对应音乐详情页，并定位到具体评论
+    async function openNotif(id) {
+      const n = lastLoaded.find(x => x.id === id);
+      if (!n) return;
+      const type = (n.contentType || "").toUpperCase();
+      const cid = n.contentId;
+
+      if (type === "COMMENT") {
+        // contentId 是被回复的评论 id，先查出它所属的音乐 id
+        try {
+          const r = await fetch(`/comment/id?id=${encodeURIComponent(cid)}`);
+          const d = await r.json();
+          if ((d.baseVo && !d.baseVo.success) || !d.commentVo) {
+            return toast((d.baseVo && d.baseVo.errorMessage) || "该评论不存在或已删除", false);
+          }
+          location.href = `detail.html?id=${d.commentVo.musicId}&commentId=${encodeURIComponent(cid)}`;
+        } catch (e) {
+          toast("请求失败: " + e.message, false);
+        }
+      } else if (type === "MUSIC") {
+        location.href = `detail.html?id=${encodeURIComponent(cid)}`;
+      } else {
+        toast("该通知暂不支持跳转", false);
+      }
+    }
+
+    async function removeNotif(id) {
+      if (!confirm("确认删除这条通知？")) return;
+      try {
+        const r = await fetch(`/notification/delete?id=${id}`, { method: "DELETE" });
+        const data = await r.json();
+        if (data.success) {
+          toast("删除成功");
+          // 删除后若当前页空了且不是第一页，回退一页
+          if (lastLoaded.length === 1 && pageNum > 1) pageNum--;
+          load();
+        } else {
+          toast(data.errorMessage || "删除失败", false);
+        }
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    (async function init() {
+      await resolveUser();
+      await load();
+    })();
+  </script>
+</body>
+</html>

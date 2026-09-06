@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>音乐排行榜</title>
+  <script>
+    // 登录守卫：未登录跳转登录页
+    if (!sessionStorage.getItem("musicUser")) location.replace("login.html");
+  </script>
+  <link rel="stylesheet" href="css/qqmusic.css">
+  <script defer src="js/shell.js"></script>
+  <style>
+    /* 铺满：内容区纵向撑满，榜单卡片占满剩余高度 */
+    .qm-content.full { display: flex; flex-direction: column; }
+    #card { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; }
+    #card .state { margin: auto; }
+
+    /* 榜单头图：QQ 音乐飙升榜式的绿色横幅 */
+    .rank-hero {
+      display: flex; align-items: center; gap: 18px; padding: 24px 26px; margin-bottom: 16px;
+      border-radius: var(--qm-radius); color: #fff;
+      background: linear-gradient(120deg, #31c27c 0%, #1eaa93 100%);
+      box-shadow: 0 8px 24px rgba(49,194,124,.28);
+    }
+    .rank-hero .badge-ico {
+      width: 62px; height: 62px; border-radius: 16px; flex-shrink: 0; font-size: 30px;
+      background: rgba(255,255,255,.2);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .rank-hero h2 { font-size: 22px; font-weight: 700; }
+    .rank-hero p { font-size: 13px; opacity: .9; margin-top: 4px; }
+
+    .row {
+      display: flex; align-items: center; gap: 14px; padding: 11px 20px;
+      border-bottom: 1px solid var(--qm-border); color: inherit; transition: .12s;
+    }
+    .row:last-child { border-bottom: none; }
+    .row:hover { background: var(--qm-hover); color: inherit; }
+    .rank {
+      width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; color: var(--qm-text-3); background: var(--qm-hover);
+    }
+    .rank.top1 { background: linear-gradient(135deg,#ffd86b,#f5a623); color: #fff; }
+    .rank.top2 { background: linear-gradient(135deg,#dde2e8,#aab4c0); color: #fff; }
+    .rank.top3 { background: linear-gradient(135deg,#ecc19c,#cd9a68); color: #fff; }
+    .cover {
+      width: 50px; height: 50px; border-radius: 10px; object-fit: cover; background: #eef0f2; flex-shrink: 0;
+    }
+    .cover.ph {
+      display: flex; align-items: center; justify-content: center; color: #cbd1d7; font-size: 22px;
+      background: linear-gradient(135deg, #f2f4f6, #e4e8ec);
+    }
+    .info { flex: 1; min-width: 0; }
+    .info .title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row:hover .info .title { color: var(--qm-green); }
+    .info .author { font-size: 12px; color: var(--qm-text-2); margin-top: 2px; }
+    .tags { margin-top: 4px; }
+    .go { color: #cfd4da; font-size: 18px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+  <main class="qm-main">
+    <header class="qm-top">
+      <a class="qm-back" href="music.html" title="返回音乐管理">←</a>
+      <div>
+        <h1>排行榜</h1>
+        <div class="sub">MusicRankController · /music-rank/topN</div>
+      </div>
+      <span class="spacer"></span>
+      <div class="acts">
+        <label style="font-size:13px;color:var(--qm-text-2)">榜单数量</label>
+        <select id="topN" onchange="load()">
+          <option value="5">Top 5</option>
+          <option value="10" selected>Top 10</option>
+          <option value="20">Top 20</option>
+          <option value="50">Top 50</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="qm-content full">
+      <div class="rank-hero">
+        <div class="badge-ico">🏆</div>
+        <div>
+          <h2>热歌飙升榜</h2>
+          <p>按播放热度实时更新 · 听得越多排得越前</p>
+        </div>
+      </div>
+
+      <div class="card flush" id="card">
+        <div class="state">加载中…</div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+
+  <script>
+    const API = "/music-rank";
+
+    function toast(msg, ok = true) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "show " + (ok ? "ok" : "err");
+      setTimeout(() => (t.className = ""), 2200);
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+    }
+
+    function cover(m) {
+      if (m.pictureUrl) return `<img class="cover" src="${esc(m.pictureUrl)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cover ph',textContent:'♪'}))">`;
+      return `<div class="cover ph">♪</div>`;
+    }
+
+    function tagList(tags) {
+      if (!tags) return "";
+      const arr = String(tags).split(/[,，;；\s]+/).filter(Boolean).slice(0, 3);
+      if (!arr.length) return "";
+      return `<div class="tags">${arr.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>`;
+    }
+
+    function render(list) {
+      const box = document.getElementById("card");
+      if (!list || !list.length) {
+        box.innerHTML = '<div class="state">暂无排行数据</div>';
+        return;
+      }
+      box.innerHTML = list.map((m, i) => {
+        const n = i + 1;
+        const cls = n <= 3 ? ` top${n}` : "";
+        return `<a class="row" href="detail.html?id=${m.id}" title="查看详情">
+          <div class="rank${cls}">${n}</div>
+          ${cover(m)}
+          <div class="info">
+            <div class="title">${esc(m.title)}</div>
+            <div class="author">${esc(m.author) || "未知歌手"}</div>
+            ${tagList(m.tags)}
+          </div>
+          <div class="go">›</div>
+        </a>`;
+      }).join("");
+    }
+
+    async function load() {
+      const n = document.getElementById("topN").value;
+      document.getElementById("card").innerHTML = '<div class="state">加载中…</div>';
+      try {
+        const r = await fetch(`${API}/topN?n=${encodeURIComponent(n)}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) {
+          document.getElementById("card").innerHTML =
+            `<div class="state">${esc(data.baseVo.errorMessage || "加载失败")}</div>`;
+          return;
+        }
+        render(data.musicVoList || []);
+      } catch (e) {
+        document.getElementById("card").innerHTML = `<div class="state">请求失败：${esc(e.message)}</div>`;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

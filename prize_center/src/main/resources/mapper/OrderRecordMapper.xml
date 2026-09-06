@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.prize_center.mapper.OrderRecordMapper">
+
+    <resultMap id="OrderRecordMap"
+               type="com.example.prize_center.entity.OrderRecord">
+
+        <id property="id" column="id"/>
+
+        <result property="outBizNo" column="out_biz_no"/>
+
+        <result property="code" column="code"/>
+
+        <result property="amount" column="amount"/>
+
+        <result property="prizeTime" column="prize_time"/>
+
+    </resultMap>
+
+    <insert id="add"
+            useGeneratedKeys="true"
+            keyProperty="id">
+
+        insert into order_record
+        (
+        out_biz_no,
+        code,
+        amount,
+        prize_time
+        )
+        values
+        (
+        #{outBizNo},
+        #{code},
+        #{amount},
+        now()
+        )
+
+    </insert>
+
+    <delete id="delete">
+
+        delete
+        from order_record
+        where id = #{id}
+
+    </delete>
+
+    <update id="modify">
+
+        update order_record
+        set
+        code = #{code},
+        amount = #{amount}
+        prize_time = now()
+        where id = #{id}
+
+    </update>
+
+    <select id="queryById"
+            resultMap="OrderRecordMap">
+
+        select
+        id,
+        out_biz_no,
+        code,
+        amount,
+        prize_time
+        from order_record
+        where id = #{id}
+
+    </select>
+
+    <select id="queryByOutBizNo"
+            resultMap="OrderRecordMap">
+
+        select
+        id,
+        out_biz_no,
+        code,
+        amount,
+        prize_time
+        from order_record
+        where out_biz_no = #{outBizNo}
+
+    </select>
+
+    <select id="queryAll"
+            resultMap="OrderRecordMap">
+
+        select
+        id,
+        out_biz_no,
+        code,
+        amount,
+        prize_time
+        from order_record
+        where prize_time between #{startTime} and #{endTime}
+        order by prize_time desc
+        limit #{start},#{size}
+
+    </select>
+    <select id="queryByTime"
+            resultMap="OrderRecordMap">
+
+        select
+        id,
+        out_biz_no,
+        code,
+        amount,
+        prize_time
+        from order_record
+        where prize_time between #{startTime} and #{endTime}
+        order by prize_time desc
+
+    </select>
+
+</mapper>

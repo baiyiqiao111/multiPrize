@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 · 音乐管理</title>
+  <link rel="stylesheet" href="css/qqmusic.css">
+  <style>
+    .field { margin-bottom: 16px; }
+  </style>
+</head>
+<body class="qm-auth">
+  <div class="auth-card">
+    <div class="logo">♪</div>
+    <h1>音乐管理系统</h1>
+    <div class="sub">听我想听的歌 · 请登录后访问</div>
+
+    <div class="field">
+      <label>用户名</label>
+      <input id="name" autocomplete="username" placeholder="请输入用户名" />
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="请输入密码" />
+    </div>
+    <button class="primary" id="btn" onclick="doLogin()">登 录</button>
+    <div class="err" id="err"></div>
+
+    <div class="foot">还没有账号？<a href="register.html">立即注册</a></div>
+  </div>
+
+  <script>
+    const API = "/user";
+
+    function setErr(msg) { document.getElementById("err").textContent = msg || ""; }
+
+    async function doLogin() {
+      const name = document.getElementById("name").value.trim();
+      const password = document.getElementById("password").value;
+      if (!name) return setErr("请输入用户名");
+      if (!password) return setErr("请输入密码");
+
+      const btn = document.getElementById("btn");
+      btn.disabled = true; btn.textContent = "登录中…"; setErr("");
+
+      try {
+        const body = new URLSearchParams({ name, password });
+        const r = await fetch(`${API}/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body
+        });
+        const data = await r.json();
+        if (data.success) {
+          sessionStorage.setItem("musicUser", name);
+          location.replace("music.html");
+        } else {
+          setErr(data.errorMessage || "用户名或密码错误");
+          btn.disabled = false; btn.textContent = "登 录";
+        }
+      } catch (e) {
+        setErr("请求失败：" + e.message);
+        btn.disabled = false; btn.textContent = "登 录";
+      }
+    }
+
+    // 已登录则直接进入
+    if (sessionStorage.getItem("musicUser")) location.replace("music.html");
+
+    // 回车登录
+    ["name", "password"].forEach(id =>
+      document.getElementById(id).addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); }));
+  </script>
+</body>
+</html>

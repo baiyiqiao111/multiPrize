@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.music.mapper.UserMapper">
+
+    <resultMap id="userMap" type="com.example.music.entity.User">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="password" property="password"/>
+        <result column="email" property="email"/>
+        <result column="interests" property="interests"/>
+        <result column="age" property="age"/>
+        <result column="gender" property="gender"/>
+        <result column="register_time" property="registerTime"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, name, password, email, interests, age, gender, register_time
+    </sql>
+
+    <insert id="insert" parameterType="com.example.music.entity.User"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user (name, password, email, interests, age, gender, register_time)
+        VALUES (#{name}, #{password}, #{email}, #{interests}, #{age}, #{gender}, now())
+    </insert>
+
+    <delete id="deleteById">
+        DELETE FROM user WHERE id = #{id}
+    </delete>
+
+    <update id="update" parameterType="com.example.music.entity.User">
+        UPDATE user
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="password != null">password = #{password},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="interests != null">interests = #{interests},</if>
+            <if test="age != null">age = #{age},</if>
+            <if test="gender != null">gender = #{gender},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectAll" resultMap="userMap">
+        SELECT <include refid="baseColumns"/> FROM user ORDER BY id
+    </select>
+
+    <select id="selectByName" resultMap="userMap">
+        SELECT <include refid="baseColumns"/> FROM user
+        WHERE name LIKE CONCAT('%', #{name}, '%') ORDER BY id
+    </select>
+
+    <select id="selectById" resultMap="userMap">
+        SELECT <include refid="baseColumns"/> FROM user WHERE id = #{id}
+    </select>
+
+    <select id="selectByExactName" resultMap="userMap">
+        SELECT <include refid="baseColumns"/> FROM user WHERE name = #{name}
+    </select>
+
+    <select id="queryByIds" resultMap="userMap">
+
+        SELECT
+        <include refid="baseColumns"/>
+
+        FROM user
+
+        WHERE id IN
+
+        <foreach collection="ids"
+                 item="id"
+                 open="("
+                 separator=","
+                 close=")">
+
+            #{id}
+
+        </foreach>
+
+    </select>
+</mapper>

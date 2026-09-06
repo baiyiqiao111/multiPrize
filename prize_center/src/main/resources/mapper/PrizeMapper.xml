@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.prize_center.mapper.PrizeMapper">
+
+    <resultMap id="PrizeMap"
+               type="com.example.prize_center.entity.Prize">
+
+        <id property="id" column="id"/>
+
+        <result property="code" column="code"/>
+
+        <result property="stock" column="stock"/>
+
+        <result property="icon" column="icon"/>
+
+        <result property="updateTime" column="update_time"/>
+
+    </resultMap>
+
+    <insert id="add">
+
+        insert into prize
+        (
+        code,
+        stock,
+        icon,
+        update_time
+        )
+        values
+        (
+        #{code},
+        #{stock},
+        #{icon},
+        now()
+        )
+
+    </insert>
+
+    <delete id="delete">
+
+        delete
+        from prize
+        where id = #{id}
+
+    </delete>
+
+    <update id="modify">
+
+        update prize
+        set
+        code = #{code},
+        stock = #{stock},
+        icon = #{icon},
+        update_time = now()
+        where id = #{id}
+
+    </update>
+
+    <select id="queryById"
+            resultMap="PrizeMap">
+
+        select *
+        from prize
+        where id = #{id}
+
+    </select>
+
+    <select id="queryAll"
+            resultMap="PrizeMap">
+
+        select *
+        from prize
+        order by id
+        limit #{start}, #{size}
+    </select>
+    <select id="queryByCode"
+            resultMap="PrizeMap">
+
+        select *
+        from prize
+        where code = #{code}
+
+    </select>
+
+</mapper>

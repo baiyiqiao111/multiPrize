@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.music.mapper.MusicMapper">
+
+    <resultMap id="musicMap" type="com.example.music.entity.Music">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="content" property="content"/>
+        <result column="tags" property="tags"/>
+        <result column="publish_time" property="publishTime"/>
+        <result column="picture_url" property="pictureUrl"/>
+        <result column="sound_url" property="soundUrl"/>
+        <result column="author" property="author"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id,
+        title,
+        content,
+        tags,
+        publish_time,
+        picture_url,
+        sound_url,
+        author
+    </sql>
+
+    <insert id="add"
+            parameterType="com.example.music.entity.Music"
+            useGeneratedKeys="true"
+            keyProperty="id">
+
+        INSERT INTO music
+        (
+            title,
+            content,
+            tags,
+            publish_time,
+            picture_url,
+            sound_url,
+            author
+        )
+        VALUES
+            (
+                #{title},
+                #{content},
+                #{tags},
+                now(),
+                #{pictureUrl},
+                #{soundUrl},
+                #{author}
+            )
+
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM music
+        WHERE id = #{id}
+    </delete>
+
+    <update id="modify"
+            parameterType="com.example.music.entity.Music">
+
+        UPDATE music
+
+        <set>
+            <if test="title != null">
+                title = #{title},
+            </if>
+
+            <if test="content != null">
+                content = #{content},
+            </if>
+
+            <if test="tags != null">
+                tags = #{tags},
+            </if>
+
+            <if test="pictureUrl != null">
+                picture_url = #{pictureUrl},
+            </if>
+
+            <if test="soundUrl != null">
+                sound_url = #{soundUrl},
+            </if>
+
+            <if test="author != null">
+                author = #{author},
+            </if>
+        </set>
+
+        WHERE id = #{id}
+
+    </update>
+
+    <select id="queryAll" resultMap="musicMap">
+        SELECT
+        <include refid="baseColumns"/>
+        FROM music
+        ORDER BY publish_time desc
+        limit #{start},#{size}
+    </select>
+
+    <select id="queryByTitle" resultMap="musicMap">
+        SELECT
+        <include refid="baseColumns"/>
+        FROM music
+        WHERE title LIKE CONCAT('%', #{title}, '%')
+        ORDER BY id
+    </select>
+
+    <select id="queryById" resultMap="musicMap">
+        SELECT
+        <include refid="baseColumns"/>
+        FROM music
+        WHERE id = #{id}
+    </select>
+
+    <select id="queryByIds" resultMap="musicMap">
+        SELECT
+        <include refid="baseColumns"/>
+        FROM music
+        WHERE id IN
+        <foreach collection="list"
+                 item="id"
+                 open="("
+                 separator=","
+                 close=")">
+            #{id}
+        </foreach>
+        ORDER BY FIELD(id,
+        <foreach collection="list" item="item" separator=",">
+            #{item}
+        </foreach>
+        )
+    </select>
+
+</mapper>

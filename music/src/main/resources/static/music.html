@@ -1,0 +1,900 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>发现音乐 · 音乐管理</title>
+  <script>
+    // 登录守卫：未登录跳转登录页
+    if (!sessionStorage.getItem("musicUser")) location.replace("login.html");
+  </script>
+  <link rel="stylesheet" href="css/qqmusic.css">
+  <script defer src="js/shell.js"></script>
+  <style>
+    /* ---------- 歌曲卡片网格 ---------- */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(216px, 1fr)); gap: 20px; }
+    .music {
+      background: #fff; border-radius: var(--qm-radius); overflow: hidden;
+      box-shadow: var(--qm-shadow); display: flex; flex-direction: column;
+      transition: transform .18s, box-shadow .18s;
+    }
+    .music:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(0,0,0,.10); }
+    .music .cover-wrap { position: relative; aspect-ratio: 1 / 1; background: #eef0f2; }
+    .music .cover-link { display: block; height: 100%; }
+    .music .cover { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .music .cover.ph {
+      display: flex; align-items: center; justify-content: center; font-size: 46px; color: #cbd1d7;
+      background: linear-gradient(135deg, #f2f4f6, #e4e8ec);
+    }
+    /* 悬浮遮罩：贴近 QQ 音乐专辑封面的播放交互 */
+    .music .cover-wrap::after {
+      content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.16);
+      opacity: 0; transition: .18s; pointer-events: none;
+    }
+    .music:hover .cover-wrap::after { opacity: 1; }
+    .play-fab {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.85);
+      width: 46px; height: 46px; padding: 0; border-radius: 50%;
+      background: var(--qm-green); color: #fff; font-size: 17px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 14px rgba(0,0,0,.28);
+      opacity: 0; transition: .18s;
+    }
+    .music:hover .play-fab, .play-fab.playing { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .play-fab:hover { background: var(--qm-green-dark); }
+    .like-fab {
+      position: absolute; top: 10px; right: 10px;
+      width: 32px; height: 32px; padding: 0; border-radius: 50%;
+      background: rgba(255,255,255,.92); color: var(--qm-red); font-size: 15px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,.16);
+    }
+    .like-fab:hover { background: #fff; transform: scale(1.1); }
+    .like-fab.liked { background: var(--qm-red); }
+
+    .music .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .music .title { font-size: 15px; font-weight: 600; line-height: 1.35; }
+    .music .title-link { color: inherit; }
+    .music .title-link:hover { color: var(--qm-green); }
+    .music .author { font-size: 12px; color: var(--qm-text-2); }
+    .music .content {
+      font-size: 12px; color: var(--qm-text-2); line-height: 1.5; max-height: 54px; overflow: hidden;
+    }
+    .music .tags { margin-top: 2px; }
+    .music .meta { font-size: 11px; color: var(--qm-text-3); margin-top: auto; }
+    .music .actions { display: flex; gap: 8px; margin-top: 8px; }
+    .audio-wrap { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+    .audio-wrap .dur { margin-top: 0; }   /* 时长标签不参与卡片底部对齐 */
+    /* 空态占满整行并保持卡片底色 */
+    .grid > .empty { background: #fff; border-radius: var(--qm-radius); box-shadow: var(--qm-shadow); }
+
+    .modal .toolbar { margin-bottom: 12px; }
+    .modal td { word-break: break-all; }
+    .modal .pager { margin-top: 14px; }
+
+    /* ---------- AI 助手悬浮按钮 + 对话框 ---------- */
+    .bot-fab {
+      position: fixed; right: 26px; bottom: 26px; z-index: 90;
+      width: 54px; height: 54px; border-radius: 50%; padding: 0;
+      background: linear-gradient(135deg, #4fdc9a, var(--qm-green));
+      color: #fff; font-size: 24px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 18px rgba(49,194,124,.45);
+      transition: transform .18s, box-shadow .18s;
+    }
+    .bot-fab:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 8px 24px rgba(49,194,124,.55); }
+
+    .bot-panel {
+      position: fixed; right: 26px; bottom: 92px; z-index: 91;
+      width: 360px; max-width: calc(100vw - 40px); height: 520px; max-height: calc(100vh - 130px);
+      background: #fff; border-radius: 16px; overflow: hidden;
+      box-shadow: 0 16px 44px rgba(0,0,0,.22);
+      display: none; flex-direction: column;
+      transform: translateY(12px); opacity: 0; transition: transform .18s, opacity .18s;
+    }
+    .bot-panel.show { display: flex; transform: translateY(0); opacity: 1; }
+    .bot-header {
+      background: linear-gradient(135deg, #35cd86, var(--qm-green)); color: #fff; padding: 13px 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .bot-header .t { font-size: 15px; font-weight: 600; }
+    .bot-header .s { font-size: 11px; opacity: .85; }
+    .bot-header .sp { flex: 1; }
+    .bot-header button {
+      background: rgba(255,255,255,.2); color: #fff; padding: 4px 10px; font-size: 12px; border-radius: 999px;
+    }
+    .bot-header button:hover { background: rgba(255,255,255,.32); }
+
+    .bot-body {
+      flex: 1; overflow-y: auto; padding: 14px; background: var(--qm-bg);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .bot-msg { display: flex; gap: 8px; align-items: flex-end; }
+    .bot-msg.me { flex-direction: row-reverse; }
+    .bot-msg .av {
+      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+      background: var(--qm-green-soft);
+    }
+    .bot-msg.me .av { background: #e8eaed; }
+    .bot-msg .bubble {
+      max-width: 74%; padding: 9px 13px; border-radius: 14px; font-size: 14px;
+      line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+      background: #fff; color: var(--qm-text); box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .bot-msg.me .bubble { background: var(--qm-green); color: #fff; }
+    .bot-msg .bubble.typing { color: var(--qm-text-3); font-style: italic; }
+
+    .bot-input {
+      display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--qm-border); background: #fff;
+    }
+    .bot-input textarea { flex: 1; resize: none; height: 40px; max-height: 96px; min-height: 40px; }
+    .bot-input button { padding: 0 18px; }
+  </style>
+</head>
+<body>
+  <main class="qm-main">
+    <header class="qm-top">
+      <div>
+        <h1>发现音乐</h1>
+        <div class="sub">MusicController · /music</div>
+      </div>
+      <input id="searchTitle" class="search" placeholder="搜索歌曲名…" />
+      <button class="small" onclick="searchByTitle()">搜索</button>
+      <span class="spacer"></span>
+      <div class="acts">
+        <button class="icon-btn" onclick="openSysConfig()" title="系统配置" aria-label="系统配置">⚙️</button>
+        <button class="icon-btn" onclick="location.href='notification.html'" title="系统通知" aria-label="系统通知">
+          🔔<span class="badge" id="notifBadge" style="display:none">0</span>
+        </button>
+        <a class="icon-btn" href="rank.html" title="排行榜" aria-label="排行榜">🏆</a>
+      </div>
+    </header>
+
+    <div class="qm-content">
+      <div class="card">
+        <div class="toolbar">
+          <button onclick="openAdd()">+ 新增音乐</button>
+          <button class="ghost" onclick="firstPage()">全部音乐</button>
+          <input id="searchId" type="number" placeholder="按 ID 查询" style="width:130px" />
+          <button class="ghost" onclick="searchById()">按 ID 查找</button>
+          <span style="flex:1"></span>
+          <label style="font-size:13px;color:var(--qm-text-2)">每页</label>
+          <select id="pageSize" onchange="firstPage()">
+            <option value="6">6</option>
+            <option value="12" selected>12</option>
+            <option value="24">24</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="list" class="grid">
+        <div class="empty" style="grid-column:1/-1">点击「全部音乐」加载数据</div>
+      </div>
+
+      <div class="card" id="pagerCard" style="display:none;margin-top:16px">
+        <div class="pager">
+          <button class="ghost" id="prevBtn" onclick="prevPage()">上一页</button>
+          <span class="pn" id="pageNo">第 1 页</span>
+          <button class="ghost" id="nextBtn" onclick="nextPage()">下一页</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 新增 / 编辑弹窗 -->
+  <div class="mask" id="mask">
+    <div class="modal">
+      <h3 id="modalTitle">新增音乐</h3>
+      <input type="hidden" id="f_id" />
+      <input type="hidden" id="f_publishTime" />
+      <div class="field"><label>标题</label><input id="f_title" /></div>
+      <div class="field"><label>歌手</label><input id="f_author" /></div>
+      <div class="field"><label>简介</label><textarea id="f_content"></textarea></div>
+      <div class="field"><label>标签（逗号分隔）</label><input id="f_tags" placeholder="流行, 华语, 经典" /></div>
+      <div class="field">
+        <label>封面图片（上传到 MinIO，自动填充下方 URL）</label>
+        <input type="file" id="f_pictureFile" accept="image/*"
+               onchange="uploadTo(this, 'f_pictureUrl', 'pictureStatus')" />
+        <div id="pictureStatus" style="font-size:12px;color:var(--qm-text-2);margin-top:4px;"></div>
+      </div>
+      <div class="field"><label>封面图 URL</label><input id="f_pictureUrl" placeholder="可直接填写，或通过上方上传自动生成" /></div>
+      <div class="field">
+        <label>音频文件（上传到 MinIO，自动填充下方 URL）</label>
+        <input type="file" id="f_soundFile" accept="audio/*"
+               onchange="uploadTo(this, 'f_soundUrl', 'soundStatus')" />
+        <div id="soundStatus" style="font-size:12px;color:var(--qm-text-2);margin-top:4px;"></div>
+      </div>
+      <div class="field"><label>音频 URL</label><input id="f_soundUrl" placeholder="可直接填写，或通过上方上传自动生成" /></div>
+      <div class="modal-actions">
+        <button class="ghost" onclick="closeModal()">取消</button>
+        <button onclick="submitForm()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 系统配置：列表弹窗 -->
+  <div class="mask" id="sysMask">
+    <div class="modal" style="width:660px">
+      <h3>⚙️ 系统配置管理</h3>
+      <div class="toolbar">
+        <input id="sysSearchCode" placeholder="按 code 精确查询…" style="width:180px" />
+        <button onclick="searchSysByCode()">查询</button>
+        <button class="ghost" onclick="clearSysSearch()">全部</button>
+        <button onclick="openSysAdd()">+ 新增配置</button>
+        <button class="ghost" onclick="loadSysConfigs()">刷新</button>
+        <span style="flex:1"></span>
+        <label style="font-size:13px;color:var(--qm-text-2)">每页</label>
+        <select id="sysPageSize" onchange="sysFirstPage()">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+        </select>
+      </div>
+      <table>
+        <thead>
+          <tr><th style="width:70px">ID</th><th>配置项 code</th><th>配置值 value</th><th style="text-align:right">操作</th></tr>
+        </thead>
+        <tbody id="sysTbody">
+          <tr><td colspan="4" class="empty">加载中…</td></tr>
+        </tbody>
+      </table>
+      <div class="pager" id="sysPager">
+        <button class="ghost" id="sysPrevBtn" onclick="sysPrev()">上一页</button>
+        <span class="pn" id="sysPageNo">第 1 页</span>
+        <button class="ghost" id="sysNextBtn" onclick="sysNext()">下一页</button>
+      </div>
+      <div class="modal-actions">
+        <button class="ghost" onclick="closeSys()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 系统配置：新增 / 编辑表单弹窗 -->
+  <div class="mask" id="sysFormMask">
+    <div class="modal" style="width:420px">
+      <h3 id="sysFormTitle">新增配置</h3>
+      <input type="hidden" id="sf_id" />
+      <div class="field"><label>配置项 code</label><input id="sf_code" placeholder="如 site.title" /></div>
+      <div class="field"><label>配置值 value</label><textarea id="sf_value"></textarea></div>
+      <div class="modal-actions">
+        <button class="ghost" onclick="closeSysForm()">取消</button>
+        <button onclick="submitSysForm()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI 助手：悬浮按钮 + 对话框（基于 AI-chatbot 的 McpChatBotController，运行在 8088 端口） -->
+  <button class="bot-fab" id="botFab" onclick="toggleBot()" title="AI 音乐助手" aria-label="AI 音乐助手">🤖</button>
+  <div class="bot-panel" id="botPanel">
+    <div class="bot-header">
+      <span style="font-size:20px">🤖</span>
+      <div>
+        <div class="t">AI 音乐助手</div>
+        <div class="s">基于 MCP · 随时为你解答</div>
+      </div>
+      <span class="sp"></span>
+      <button onclick="resetBot()" title="清空对话">清空</button>
+      <button onclick="toggleBot()" title="收起">✕</button>
+    </div>
+    <div class="bot-body" id="botBody"></div>
+    <div class="bot-input">
+      <textarea id="botText" placeholder="输入问题，回车发送…"></textarea>
+      <button id="botSend" onclick="sendBot()">发送</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const API = "/music";
+    let pageNum = 1;
+    let reload = firstPage;   // 记住当前视图，增删改后刷新
+
+    // 当前用户展示、退出登录、奖品中心 / 金币记录入口均由左侧导航栏（js/shell.js）提供
+
+    // ---------- 点赞 ----------
+    let currentUserId = null;
+    const likedSet = new Set();   // 当前用户已点赞的音乐 id
+
+    // 解析当前用户 id，并加载其点赞过的音乐集合
+    async function loadLikes() {
+      const name = sessionStorage.getItem("musicUser");
+      try {
+        const ru = await fetch(`/user/name?name=${encodeURIComponent(name)}`);
+        const du = await ru.json();
+        const users = du.userVoList || [];
+        const me = users.find(u => u.name === name) || users[0];
+        if (me) currentUserId = me.id;
+        if (currentUserId != null) {
+          const r = await fetch(`/like/user?userId=${currentUserId}`);
+          const d = await r.json();
+          (d.musicVoList || []).forEach(m => likedSet.add(m.id));
+        }
+      } catch (e) { /* 点赞状态加载失败不阻断列表 */ }
+    }
+
+    async function toggleLike(musicId, btn) {
+      if (!currentUserId) return toast("无法识别当前用户，请重新登录", false);
+      const liked = likedSet.has(musicId);
+      const url = `/like/${liked ? "delete" : "add"}?userId=${currentUserId}&musicId=${musicId}`;
+      btn.disabled = true;
+      try {
+        const r = await fetch(url, { method: liked ? "DELETE" : "POST" });
+        const data = await r.json();
+        if (data.success) {
+          if (liked) likedSet.delete(musicId); else likedSet.add(musicId);
+          const now = likedSet.has(musicId);
+          btn.classList.toggle("liked", now);
+          btn.textContent = now ? "❤️" : "🤍";
+          toast(now ? "点赞成功" : "已取消点赞");
+        } else {
+          toast(data.errorMessage || "操作失败", false);
+        }
+      } catch (e) {
+        toast("请求失败: " + e.message, false);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ---------- 播放时长同步上报（基于 prize_sender 的 SyncController，运行在 8085 端口） ----------
+    // 说明：即使不进入音乐详情页，直接在列表中播放音乐也会调用 /sync 上报播放时长
+    const SYNC_API = `http://${location.hostname}:8085/sync`;
+    const SYNC_INTERVAL_MS = 30000;   // 每 30 秒上报一次
+    const SYNC_DURATION = 30;         // 每次上报的播放时长（秒）
+    const SYNC_SCENE = "PLAY_MUSIC";  // 发奖场景，默认播放音乐
+    const SYNC_PRIZE_CODE = "COIN";   // 奖品码，默认金币
+
+    // 上报一次播放记录：调用 SyncController 的 /sync/sync
+    async function reportPlay(musicId) {
+      if (currentUserId == null || !musicId) return;   // 用户未识别或缺少音乐 id 时不上报
+      const params = new URLSearchParams({
+        userId: currentUserId,
+        musicId: musicId,
+        duration: SYNC_DURATION,
+        scene: SYNC_SCENE,
+        prizeCode: SYNC_PRIZE_CODE
+      });
+      try {
+        await fetch(`${SYNC_API}/sync?${params.toString()}`, { method: "POST" });
+      } catch (e) { /* 上报失败不打断播放体验 */ }
+    }
+
+    // 清掉当前列表中所有音频遗留的上报计时器
+    function stopAllSync() {
+      document.querySelectorAll("#list audio").forEach(a => {
+        if (a._syncTimer) { clearInterval(a._syncTimer); a._syncTimer = null; }
+      });
+    }
+
+    // 为列表中每个音频绑定播放事件：播放中每 30s 上报一次，暂停 / 结束时停止
+    // 同时把封面上的播放按钮图标与音频状态保持同步
+    function bindPlaySync() {
+      document.querySelectorAll("#list audio[data-music-id]").forEach(a => {
+        const musicId = a.getAttribute("data-music-id");
+        const fab = a.closest(".music").querySelector(".play-fab");
+        const paint = playing => {
+          if (!fab) return;
+          fab.textContent = playing ? "❚❚" : "▶";
+          fab.classList.toggle("playing", playing);
+        };
+        const stop = () => { clearInterval(a._syncTimer); a._syncTimer = null; paint(false); };
+        a.addEventListener("play", () => {
+          if (!a._syncTimer) a._syncTimer = setInterval(() => reportPlay(musicId), SYNC_INTERVAL_MS);
+          paint(true);
+        });
+        a.addEventListener("pause", stop);
+        a.addEventListener("ended", stop);
+      });
+    }
+    window.addEventListener("beforeunload", stopAllSync);
+
+    // 点击封面上的绿色按钮播放 / 暂停，同一时间只播放一首
+    function togglePlay(btn) {
+      const a = btn.closest(".music").querySelector("audio");
+      if (!a) return;
+      if (a.paused) {
+        document.querySelectorAll("#list audio").forEach(o => { if (o !== a) o.pause(); });
+        a.play();
+      } else {
+        a.pause();
+      }
+    }
+
+    function toast(msg, ok = true) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "show " + (ok ? "ok" : "err");
+      setTimeout(() => (t.className = ""), 2200);
+    }
+
+    function fmtDate(d) {
+      if (!d) return "-";
+      const dt = new Date(d);
+      if (isNaN(dt)) return d;
+      const p = n => String(n).padStart(2, "0");
+      return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+    }
+
+    function cover(m) {
+      if (m.pictureUrl) return `<img class="cover" src="${esc(m.pictureUrl)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cover ph',textContent:'♪'}))">`;
+      return `<div class="cover ph">♪</div>`;
+    }
+
+    function tagList(tags) {
+      if (!tags) return "";
+      const arr = String(tags).split(/[,，;；\s]+/).filter(Boolean);
+      if (!arr.length) return "";
+      return `<div class="tags">${arr.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>`;
+    }
+
+    // 秒 -> mm:ss
+    function fmtDur(sec) {
+      if (!isFinite(sec) || sec <= 0) return "--:--";
+      const s = Math.round(sec);
+      const p = n => String(n).padStart(2, "0");
+      return `${p(Math.floor(s / 60))}:${p(s % 60)}`;
+    }
+
+    // 音频元数据加载完成后，把实际时长写入相邻的时长标签
+    function showDur(a) {
+      const el = a.parentElement && a.parentElement.querySelector(".dur");
+      if (el) el.textContent = "时长 " + fmtDur(a.duration);
+    }
+
+    function audio(m) {
+      if (!m.soundUrl) return "";
+      // preload="metadata" 让浏览器仅加载时长等元数据，避免时长显示为 0
+      return `<div class="audio-wrap">
+        <audio controls preload="metadata" data-music-id="${m.id}" src="${esc(m.soundUrl)}" onloadedmetadata="showDur(this)"></audio>
+        <span class="meta dur">时长 --:--</span>
+      </div>`;
+    }
+
+    function render(list) {
+      const box = document.getElementById("list");
+      stopAllSync();   // 重新渲染前先清掉上一批音频遗留的上报计时器
+      if (!list || list.length === 0) {
+        box.innerHTML = '<div class="empty" style="grid-column:1/-1">没有匹配的音乐</div>';
+        return;
+      }
+      box.innerHTML = list.map(m => {
+        const liked = likedSet.has(m.id);
+        return `
+        <div class="music">
+          <div class="cover-wrap">
+            <a class="cover-link" href="detail.html?id=${m.id}" title="查看详情">${cover(m)}</a>
+            ${m.soundUrl ? `<button class="play-fab" title="播放 / 暂停" onclick="togglePlay(this)">▶</button>` : ""}
+            <button class="like-fab ${liked ? "liked" : ""}" title="点赞 / 取消点赞"
+                    onclick="toggleLike(${m.id}, this)">${liked ? "❤️" : "🤍"}</button>
+          </div>
+          <div class="body">
+            <div class="title"><a class="title-link" href="detail.html?id=${m.id}">${esc(m.title)}</a></div>
+            <div class="author">${esc(m.author) || "未知歌手"}</div>
+            ${m.content ? `<div class="content">${esc(m.content)}</div>` : ""}
+            ${tagList(m.tags)}
+            ${audio(m)}
+            <div class="meta">#${m.id} · ${fmtDate(m.publishTime)}</div>
+            <div class="actions">
+              <button class="ghost small" onclick='openEdit(${JSON.stringify(m).replace(/'/g, "&#39;")})'>编辑</button>
+              <button class="danger small" onclick="removeMusic(${m.id}, '${esc(m.title)}')">删除</button>
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+      bindPlaySync();   // 列表渲染后为每个音频绑定播放时长上报
+    }
+
+    function showPager(show, count) {
+      document.getElementById("pagerCard").style.display = show ? "" : "none";
+      if (!show) return;
+      const size = parseInt(document.getElementById("pageSize").value, 10);
+      document.getElementById("pageNo").textContent = `第 ${pageNum} 页`;
+      document.getElementById("prevBtn").disabled = pageNum <= 1;
+      // 没拿满一页说明已到末页
+      document.getElementById("nextBtn").disabled = count < size;
+    }
+
+    async function loadPage() {
+      reload = loadPage;
+      const size = document.getElementById("pageSize").value;
+      try {
+        const r = await fetch(`${API}/all?pageNum=${pageNum}&pageSize=${size}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success)
+          return toast(data.baseVo.errorMessage || "加载失败", false);
+        const list = data.musicVoList || [];
+        if (!list.length && pageNum > 1) { pageNum--; return toast("已经是最后一页", false); }
+        render(list);
+        showPager(true, list.length);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    function firstPage() { pageNum = 1; loadPage(); }
+    function prevPage() { if (pageNum > 1) { pageNum--; loadPage(); } }
+    function nextPage() { pageNum++; loadPage(); }
+
+    async function searchByTitle() {
+      reload = searchByTitle;
+      const title = document.getElementById("searchTitle").value.trim();
+      if (!title) return firstPage();
+      try {
+        const r = await fetch(`${API}/title?title=${encodeURIComponent(title)}`);
+        const data = await r.json();
+        showPager(false);
+        if (data.baseVo && !data.baseVo.success) { render([]); return toast(data.baseVo.errorMessage || "未找到", false); }
+        render(data.musicVo ? [data.musicVo] : []);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function searchById() {
+      reload = searchById;
+      const id = document.getElementById("searchId").value.trim();
+      if (!id) return;
+      try {
+        const r = await fetch(`${API}/id?id=${encodeURIComponent(id)}`);
+        const data = await r.json();
+        showPager(false);
+        if (data.baseVo && !data.baseVo.success) { render([]); return toast(data.baseVo.errorMessage || "未找到", false); }
+        render(data.musicVo ? [data.musicVo] : []);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // ---------- 新增 / 编辑 / 删除 ----------
+    const FIELDS = ["id", "title", "author", "content", "tags", "pictureUrl", "soundUrl", "publishTime"];
+
+    function openAdd() {
+      document.getElementById("modalTitle").textContent = "新增音乐";
+      FIELDS.forEach(f => document.getElementById("f_" + f).value = "");
+      resetUpload();
+      document.getElementById("mask").classList.add("show");
+    }
+
+    function openEdit(m) {
+      document.getElementById("modalTitle").textContent = "编辑音乐 #" + m.id;
+      FIELDS.forEach(f => document.getElementById("f_" + f).value = m[f] ?? "");
+      resetUpload();
+      document.getElementById("mask").classList.add("show");
+    }
+
+    function closeModal() { document.getElementById("mask").classList.remove("show"); }
+
+    // 通用文件上传到 MinIO，成功后回填指定的 URL 输入框（音频 / 封面共用）
+    async function uploadTo(input, targetId, statusId) {
+      const file = input.files && input.files[0];
+      const status = document.getElementById(statusId);
+      if (!file) return;
+
+      status.style.color = "var(--qm-text-2)";
+      status.textContent = `上传中… ${file.name}`;
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const r = await fetch("/file/upload", { method: "POST", body: fd });
+        const data = await r.json();
+        if (data.baseVo && data.baseVo.success && data.url) {
+          document.getElementById(targetId).value = data.url;
+          status.style.color = "var(--qm-green-dark)";
+          status.textContent = "上传成功，已填充 URL";
+          toast("上传成功");
+        } else {
+          status.style.color = "var(--qm-red)";
+          status.textContent = (data.baseVo && data.baseVo.errorMessage) || "上传失败";
+          toast(status.textContent, false);
+        }
+      } catch (e) {
+        status.style.color = "var(--qm-red)";
+        status.textContent = "上传失败：" + e.message;
+        toast("请求失败: " + e.message, false);
+      }
+    }
+
+    function resetUpload() {
+      ["f_soundFile", "f_pictureFile"].forEach(id => document.getElementById(id).value = "");
+      ["soundStatus", "pictureStatus"].forEach(id => document.getElementById(id).textContent = "");
+    }
+
+    async function submitForm() {
+      const id = document.getElementById("f_id").value;
+      const isEdit = !!id;
+      const payload = {
+        title: document.getElementById("f_title").value.trim(),
+        author: document.getElementById("f_author").value.trim(),
+        content: document.getElementById("f_content").value.trim(),
+        tags: document.getElementById("f_tags").value.trim(),
+        pictureUrl: document.getElementById("f_pictureUrl").value.trim(),
+        soundUrl: document.getElementById("f_soundUrl").value.trim()
+      };
+      if (!payload.title) return toast("标题不能为空", false);
+
+      if (isEdit) {
+        payload.id = parseInt(id, 10);
+        const pt = document.getElementById("f_publishTime").value;
+        if (pt) payload.publishTime = pt;   // 编辑时保留原发布时间
+      }
+
+      try {
+        const r = await fetch(`${API}/${isEdit ? "modify" : "add"}`, {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await r.json();
+        if (data.success) {
+          toast(isEdit ? "修改成功" : "新增成功");
+          closeModal();
+          reload();
+        } else {
+          toast(data.errorMessage || "操作失败", false);
+        }
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function removeMusic(id, title) {
+      if (!confirm(`确认删除音乐「${title}」(ID: ${id})？`)) return;
+      try {
+        const r = await fetch(`${API}/delete?id=${id}`, { method: "DELETE" });
+        const data = await r.json();
+        if (data.success) { toast("删除成功"); reload(); }
+        else toast(data.errorMessage || "删除失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // ---------- 系统配置（基于 prize_sender 的 SystemConfigController，运行在 8085 端口） ----------
+    const SYS_API = `http://${location.hostname}:8085/system-config`;
+    let sysPage = 1;
+
+    function openSysConfig() {
+      document.getElementById("sysMask").classList.add("show");
+      document.getElementById("sysSearchCode").value = "";
+      sysFirstPage();
+    }
+    function closeSys() { document.getElementById("sysMask").classList.remove("show"); }
+    function sysFirstPage() { sysPage = 1; loadSysConfigs(); }
+    function sysPrev() { if (sysPage > 1) { sysPage--; loadSysConfigs(); } }
+    function sysNext() { sysPage++; loadSysConfigs(); }
+
+    function renderSys(list) {
+      const tb = document.getElementById("sysTbody");
+      if (!list || !list.length) {
+        tb.innerHTML = '<tr><td colspan="4" class="empty">暂无配置</td></tr>';
+        return;
+      }
+      tb.innerHTML = list.map(c => `
+        <tr>
+          <td>${c.id}</td>
+          <td>${esc(c.code)}</td>
+          <td>${esc(c.value)}</td>
+          <td style="text-align:right">
+            <button class="ghost small" onclick='openSysEdit(${JSON.stringify(c).replace(/'/g, "&#39;")})'>编辑</button>
+            <button class="danger small" onclick="removeSys(${c.id})">删除</button>
+          </td>
+        </tr>`).join("");
+    }
+
+    async function loadSysConfigs() {
+      const size = parseInt(document.getElementById("sysPageSize").value, 10);
+      const start = (sysPage - 1) * size;   // 后端为 LIMIT start,size，start 是偏移量
+      const tb = document.getElementById("sysTbody");
+      tb.innerHTML = '<tr><td colspan="4" class="empty">加载中…</td></tr>';
+      try {
+        const r = await fetch(`${SYS_API}/page/${start}/${size}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) { renderSys([]); return toast(data.baseVo.errorMessage || "加载失败", false); }
+        const list = data.systemConfigVoList || [];
+        if (!list.length && sysPage > 1) { sysPage--; return toast("已经是最后一页", false); }
+        renderSys(list);
+        document.getElementById("sysPager").style.display = "";
+        document.getElementById("sysPageNo").textContent = `第 ${sysPage} 页`;
+        document.getElementById("sysPrevBtn").disabled = sysPage <= 1;
+        document.getElementById("sysNextBtn").disabled = list.length < size;
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // 按 code 精确查询（复用 SystemConfigController 的 /code/{code} 接口）
+    async function searchSysByCode() {
+      const code = document.getElementById("sysSearchCode").value.trim();
+      if (!code) return sysFirstPage();
+      const tb = document.getElementById("sysTbody");
+      tb.innerHTML = '<tr><td colspan="4" class="empty">查询中…</td></tr>';
+      try {
+        const r = await fetch(`${SYS_API}/code/${encodeURIComponent(code)}`);
+        const data = await r.json();
+        document.getElementById("sysPager").style.display = "none";   // 单条结果不分页
+        if (data.baseVo && !data.baseVo.success) { renderSys([]); return toast(data.baseVo.errorMessage || "查询失败", false); }
+        const vo = data.systemConfigVo;
+        if (!vo) { renderSys([]); return toast("未找到 code 为「" + code + "」的配置", false); }
+        renderSys([vo]);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    function clearSysSearch() {
+      document.getElementById("sysSearchCode").value = "";
+      sysFirstPage();
+    }
+
+    function openSysAdd() {
+      document.getElementById("sysFormTitle").textContent = "新增配置";
+      document.getElementById("sf_id").value = "";
+      document.getElementById("sf_code").value = "";
+      document.getElementById("sf_value").value = "";
+      document.getElementById("sysFormMask").classList.add("show");
+    }
+
+    function openSysEdit(c) {
+      document.getElementById("sysFormTitle").textContent = "编辑配置 #" + c.id;
+      document.getElementById("sf_id").value = c.id;
+      document.getElementById("sf_code").value = c.code ?? "";
+      document.getElementById("sf_value").value = c.value ?? "";
+      document.getElementById("sysFormMask").classList.add("show");
+    }
+
+    function closeSysForm() { document.getElementById("sysFormMask").classList.remove("show"); }
+
+    async function submitSysForm() {
+      const id = document.getElementById("sf_id").value;
+      const code = document.getElementById("sf_code").value.trim();
+      const value = document.getElementById("sf_value").value;
+      if (!code) return toast("配置项 code 不能为空", false);
+
+      const isEdit = !!id;
+      const params = new URLSearchParams({ code, value });
+      let url, method;
+      if (isEdit) { params.append("id", id); url = `${SYS_API}/modify?${params.toString()}`; method = "PUT"; }
+      else { url = `${SYS_API}/add?${params.toString()}`; method = "POST"; }
+
+      try {
+        const r = await fetch(url, { method });
+        const data = await r.json();
+        if (data.success) {
+          toast(isEdit ? "修改成功" : "新增成功");
+          closeSysForm();
+          loadSysConfigs();
+        } else {
+          toast(data.errorMessage || "操作失败", false);
+        }
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function removeSys(id) {
+      if (!confirm(`确认删除配置 (ID: ${id})？`)) return;
+      try {
+        const r = await fetch(`${SYS_API}/delete?id=${id}`, { method: "DELETE" });
+        const data = await r.json();
+        if (data.success) { toast("删除成功"); loadSysConfigs(); }
+        else toast(data.errorMessage || "删除失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // ---------- 系统通知未读角标 ----------
+    // 已读进度存于 localStorage（按用户），详情见 notification.html
+    function notifKey() { return "music_notif_read_" + (currentUserId != null ? currentUserId : "anon"); }
+    function getLastReadId() { return parseInt(localStorage.getItem(notifKey()) || "0", 10); }
+
+    async function loadNotifications() {
+      if (currentUserId == null) return;
+      let list = [];
+      try {
+        const r = await fetch(`/notification/all?toId=${currentUserId}&pageNum=1&pageSize=50`);
+        const d = await r.json();
+        list = d.notificationVoList || [];
+      } catch (e) { return; /* 忽略，保持上次角标 */ }
+
+      const last = getLastReadId();
+      const unread = list.filter(n => n.id > last).length;
+      const badge = document.getElementById("notifBadge");
+      if (unread > 0) { badge.style.display = ""; badge.textContent = unread > 99 ? "99+" : unread; }
+      else badge.style.display = "none";
+    }
+
+    // 回车搜索
+    document.getElementById("searchTitle").addEventListener("keydown", e => { if (e.key === "Enter") searchByTitle(); });
+    document.getElementById("searchId").addEventListener("keydown", e => { if (e.key === "Enter") searchById(); });
+    document.getElementById("sysSearchCode").addEventListener("keydown", e => { if (e.key === "Enter") searchSysByCode(); });
+
+    // ---------- AI 音乐助手（基于 AI-chatbot 的 McpChatBotController，运行在 8088 端口） ----------
+    const CHAT_API = `http://${location.hostname}:8088/chat`;
+    // 会话 id：同一浏览器会话内保持一致，便于服务端维持多轮上下文
+    let botSessionId = sessionStorage.getItem("botSessionId");
+    if (!botSessionId) {
+      botSessionId = "music-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+      sessionStorage.setItem("botSessionId", botSessionId);
+    }
+    let botSending = false;
+
+    function toggleBot() {
+      const panel = document.getElementById("botPanel");
+      const opened = panel.classList.toggle("show");
+      document.getElementById("botFab").textContent = opened ? "✕" : "🤖";
+      if (opened) {
+        if (!document.getElementById("botBody").childElementCount) {
+          appendBotMsg("你好，我是 AI 音乐助手，有什么可以帮你的吗？", "bot");
+        }
+        setTimeout(() => document.getElementById("botText").focus(), 50);
+      }
+    }
+
+    // 追加一条消息气泡；返回气泡元素以便后续更新（如“思考中…”占位）
+    function appendBotMsg(text, who) {
+      const body = document.getElementById("botBody");
+      const row = document.createElement("div");
+      row.className = "bot-msg " + (who === "me" ? "me" : "bot");
+      const av = document.createElement("div");
+      av.className = "av";
+      av.textContent = who === "me" ? "🧑" : "🤖";
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+      row.appendChild(av);
+      row.appendChild(bubble);
+      body.appendChild(row);
+      body.scrollTop = body.scrollHeight;
+      return bubble;
+    }
+
+    async function sendBot() {
+      if (botSending) return;
+      const input = document.getElementById("botText");
+      const question = input.value.trim();
+      if (!question) return;
+
+      appendBotMsg(question, "me");
+      input.value = "";
+      botSending = true;
+      document.getElementById("botSend").disabled = true;
+
+      const placeholder = appendBotMsg("思考中…", "bot");
+      placeholder.classList.add("typing");
+
+      try {
+        const r = await fetch(`${CHAT_API}/ask`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: botSessionId, question, userId: currentUserId })
+        });
+        const data = await r.json();
+        placeholder.classList.remove("typing");
+        if (data.baseVo && !data.baseVo.success) {
+          placeholder.textContent = data.baseVo.errorMessage || "抱歉，服务暂时不可用";
+        } else {
+          placeholder.textContent = data.answer || "（无内容）";
+        }
+      } catch (e) {
+        placeholder.classList.remove("typing");
+        placeholder.textContent = "请求失败：" + e.message;
+      } finally {
+        botSending = false;
+        document.getElementById("botSend").disabled = false;
+        document.getElementById("botBody").scrollTop = document.getElementById("botBody").scrollHeight;
+        input.focus();
+      }
+    }
+
+    // 清空对话：调用 /chat/reset 重置服务端会话，并清空本地气泡
+    async function resetBot() {
+      try {
+        await fetch(`${CHAT_API}/reset?sessionId=${encodeURIComponent(botSessionId)}`, { method: "POST" });
+      } catch (e) { /* 重置失败不影响本地清空 */ }
+      document.getElementById("botBody").innerHTML = "";
+      appendBotMsg("对话已清空，有什么可以帮你的吗？", "bot");
+    }
+
+    // 回车发送，Shift+Enter 换行
+    document.getElementById("botText").addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendBot(); }
+    });
+
+    (async function init() {
+      await loadLikes();       // 解析当前用户 id + 点赞集合
+      firstPage();
+      loadNotifications();     // 加载通知并展示未读角标
+      setInterval(loadNotifications, 30000);   // 定时刷新未读数
+    })();
+  </script>
+</body>
+</html>

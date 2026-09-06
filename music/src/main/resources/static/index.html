@@ -1,0 +1,534 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的主页 · 音乐管理</title>
+  <script>
+    // 登录守卫：未登录跳转登录页
+    if (!sessionStorage.getItem("musicUser")) location.replace("login.html");
+  </script>
+  <link rel="stylesheet" href="css/qqmusic.css">
+  <script defer src="js/shell.js"></script>
+  <style>
+    /* 用户表格中的彩色操作按钮 */
+    button.tag-btn { background: #fff; color: #7a6bd8; border: 1px solid #ddd8f7; }
+    button.tag-btn:hover { background: #7a6bd8; color: #fff; border-color: #7a6bd8; }
+    button.play-btn { background: #fff; color: var(--qm-green-dark); border: 1px solid #cbeedd; }
+    button.play-btn:hover { background: var(--qm-green); color: #fff; border-color: var(--qm-green); }
+    button.prize-btn { background: #fff; color: #d98f0b; border: 1px solid #f7e6c2; }
+    button.prize-btn:hover { background: #e5a020; color: #fff; border-color: #e5a020; }
+    td .small { margin-left: 4px; }
+    .gender-男 { color: #3c93e8; }
+    .gender-女 { color: #e07ba8; }
+
+    /* 我的点赞 */
+    .like-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .like-music {
+      display: flex; align-items: center; gap: 10px; color: inherit;
+      background: var(--qm-hover); border: 1px solid transparent; border-radius: 10px;
+      padding: 9px 16px 9px 12px; min-width: 160px; transition: .14s;
+    }
+    .like-music:hover { border-color: var(--qm-green); background: var(--qm-green-soft); color: inherit; }
+    .like-music .lm-ico {
+      width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; font-size: 15px;
+      background: #fff; color: var(--qm-green);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .like-music .lm-title { font-size: 14px; font-weight: 600; }
+    .like-music .lm-author { font-size: 12px; color: var(--qm-text-2); margin-top: 1px; }
+
+    .modal.wide { width: 700px; }
+    .modal .pr-toolbar { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+    .modal .pr-toolbar .field { margin-bottom: 0; }
+    .modal .pr-table-wrap { max-height: 50vh; overflow: auto; }
+    .modal .pager { margin-top: 14px; }
+  </style>
+</head>
+<body>
+  <main class="qm-main">
+    <header class="qm-top">
+      <a class="qm-back" href="music.html" title="返回音乐页面">←</a>
+      <div>
+        <h1>我的主页</h1>
+        <div class="sub">UserController · /user</div>
+      </div>
+      <input id="searchName" class="search" placeholder="搜索用户名…" />
+      <button class="small" onclick="searchByName()">搜索</button>
+    </header>
+
+    <div class="qm-content">
+  <div class="card">
+    <h3 class="card-title">❤️ 我的点赞（<span id="myLikeUser"></span>）</h3>
+    <div id="myLikes" class="like-grid"><div class="empty">加载中…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <button onclick="openAdd()">+ 新增用户</button>
+      <button class="ghost" onclick="loadAll()">全部用户</button>
+      <input id="searchId" type="number" placeholder="按 ID 查询" style="width:130px" />
+      <button class="ghost" onclick="searchById()">按 ID 查找</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>用户名</th><th>邮箱</th><th>兴趣</th>
+          <th>年龄</th><th>性别</th><th>注册时间</th><th style="text-align:right">操作</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="8" class="empty">点击「全部用户」加载数据</td></tr>
+      </tbody>
+    </table>
+  </div>
+    </div>
+  </main>
+
+  <!-- 新增 / 编辑弹窗 -->
+  <div class="mask" id="mask">
+    <div class="modal">
+      <h3 id="modalTitle">新增用户</h3>
+      <input type="hidden" id="f_id" />
+      <div class="field"><label>用户名</label><input id="f_name" /></div>
+      <div class="field"><label>密码</label><input id="f_password" type="password" /></div>
+      <div class="field"><label>邮箱</label><input id="f_email" type="email" /></div>
+      <div class="field"><label>兴趣</label><input id="f_interests" /></div>
+      <div class="field"><label>年龄</label><input id="f_age" type="number" min="0" /></div>
+      <div class="field">
+        <label>性别</label>
+        <select id="f_gender"><option value="男">男</option><option value="女">女</option></select>
+      </div>
+      <div class="modal-actions">
+        <button class="ghost" onclick="closeModal()">取消</button>
+        <button onclick="submitForm()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 播放记录弹窗 -->
+  <div class="mask" id="playMask">
+    <div class="modal wide">
+      <h3 id="playTitle">播放记录</h3>
+      <div class="pr-toolbar">
+        <div class="field"><label>开始时间</label><input id="pr_start" type="datetime-local" /></div>
+        <div class="field"><label>结束时间</label><input id="pr_end" type="datetime-local" /></div>
+        <button onclick="loadPlayRecords()">查询</button>
+        <button class="ghost" onclick="clearPlayRange()">清空时间</button>
+      </div>
+      <div class="pr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>音乐ID</th><th>播放时长(秒)</th><th>同步时间</th><th style="text-align:right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="playTbody">
+            <tr><td colspan="5" class="empty">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-actions">
+        <button class="ghost" onclick="closePlayModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 发奖记录弹窗 -->
+  <div class="mask" id="prizeMask">
+    <div class="modal wide">
+      <h3 id="prizeTitle">发奖记录</h3>
+      <div class="pr-toolbar">
+        <div class="field"><label>开始时间</label><input id="prz_start" type="datetime-local" /></div>
+        <div class="field"><label>结束时间</label><input id="prz_end" type="datetime-local" /></div>
+        <button onclick="searchPrizeRecords()">查询</button>
+        <button class="ghost" onclick="clearPrizeRange()">清空时间</button>
+        <span style="flex:1"></span>
+        <label style="font-size:13px;color:var(--qm-text-2)">每页</label>
+        <select id="prz_pageSize" onchange="searchPrizeRecords()">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+        </select>
+      </div>
+      <div class="pr-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>场景</th><th>券码</th><th>日期</th><th>阶段</th><th>金额</th><th>发奖时间</th><th>外部业务号</th><th style="text-align:right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="prizeTbody">
+            <tr><td colspan="8" class="empty">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button class="ghost" id="przPrevBtn" onclick="przPrev()">上一页</button>
+        <span class="pn" id="przPageNo">第 1 页</span>
+        <button class="ghost" id="przNextBtn" onclick="przNext()">下一页</button>
+      </div>
+      <div class="modal-actions">
+        <button class="ghost" onclick="closePrizeModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const API = "/user";
+
+    function toast(msg, ok = true) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "show " + (ok ? "ok" : "err");
+      setTimeout(() => (t.className = ""), 2200);
+    }
+
+    function fmtDate(d) {
+      if (!d) return "-";
+      const dt = new Date(d);
+      if (isNaN(dt)) return d;
+      const p = n => String(n).padStart(2, "0");
+      return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+    }
+
+    function render(users) {
+      const tb = document.getElementById("tbody");
+      if (!users || users.length === 0) {
+        tb.innerHTML = '<tr><td colspan="8" class="empty">没有匹配的用户</td></tr>';
+        return;
+      }
+      tb.innerHTML = users.map(u => `
+        <tr>
+          <td>${u.id}</td>
+          <td>${esc(u.name)}</td>
+          <td>${esc(u.email)}</td>
+          <td>${esc(u.interests)}</td>
+          <td>${u.age}</td>
+          <td class="gender-${esc(u.gender)}">${esc(u.gender)}</td>
+          <td>${fmtDate(u.registerTime)}</td>
+          <td style="text-align:right">
+            <button class="ghost small" onclick='openEdit(${JSON.stringify(u)})'>编辑</button>
+            <button class="tag-btn small" onclick="goTag(${u.id})">打标签</button>
+            <button class="play-btn small" onclick="openPlayRecords(${u.id}, '${esc(u.name)}')">播放记录</button>
+            <button class="prize-btn small" onclick="openPrizeRecords(${u.id}, '${esc(u.name)}')">发奖记录</button>
+            <button class="danger small" onclick="removeUser(${u.id}, '${esc(u.name)}')">删除</button>
+          </td>
+        </tr>`).join("");
+    }
+
+    async function loadAll() {
+      try {
+        const r = await fetch(`${API}/all`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) return toast(data.baseVo.errorMassage || "加载失败", false);
+        render(data.userVoList || []);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function searchByName() {
+      const name = document.getElementById("searchName").value.trim();
+      if (!name) return loadAll();
+      try {
+        const r = await fetch(`${API}/name?name=${encodeURIComponent(name)}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) return toast(data.baseVo.errorMassage || "查询失败", false);
+        render(data.userVoList || []);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function searchById() {
+      const id = document.getElementById("searchId").value.trim();
+      if (!id) return;
+      try {
+        const r = await fetch(`${API}/id?id=${encodeURIComponent(id)}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) { render([]); return toast(data.baseVo.errorMassage || "未找到", false); }
+        render(data.userVo ? [data.userVo] : []);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // ---------- modal ----------
+    function openAdd() {
+      document.getElementById("modalTitle").textContent = "新增用户";
+      ["f_id","f_name","f_password","f_email","f_interests","f_age"].forEach(id => document.getElementById(id).value = "");
+      document.getElementById("f_gender").value = "男";
+      document.getElementById("mask").classList.add("show");
+    }
+
+    function openEdit(u) {
+      document.getElementById("modalTitle").textContent = "编辑用户 #" + u.id;
+      document.getElementById("f_id").value = u.id;
+      document.getElementById("f_name").value = u.name ?? "";
+      document.getElementById("f_password").value = u.password ?? "";
+      document.getElementById("f_email").value = u.email ?? "";
+      document.getElementById("f_interests").value = u.interests ?? "";
+      document.getElementById("f_age").value = u.age ?? "";
+      document.getElementById("f_gender").value = u.gender || "男";
+      document.getElementById("mask").classList.add("show");
+    }
+
+    function closeModal() { document.getElementById("mask").classList.remove("show"); }
+
+    // 跳转到打标签页面，带上用户 ID
+    function goTag(id) {
+      location.href = `interest.html?userId=${encodeURIComponent(id)}`;
+    }
+
+    // ---------- 播放记录（基于 prize_sender 的 PlayRecordController，运行在 8085 端口） ----------
+    const PLAY_API = `http://${location.hostname}:8085/playRecord`;
+    let currentPlayUser = { id: null, name: "" };
+
+    // datetime-local 值(如 2026-07-10T12:30) → 后端格式 2026-07-10 12:30:00
+    function toApiTime(v) {
+      if (!v) return "";
+      const s = v.replace("T", " ");
+      return s.length === 16 ? s + ":00" : s;
+    }
+
+    function openPlayRecords(id, name) {
+      currentPlayUser = { id, name };
+      document.getElementById("playTitle").textContent = `播放记录 · ${name} (ID: ${id})`;
+      clearPlayRange();
+      document.getElementById("playMask").classList.add("show");
+      loadPlayRecords();
+    }
+
+    function closePlayModal() { document.getElementById("playMask").classList.remove("show"); }
+
+    function clearPlayRange() {
+      document.getElementById("pr_start").value = "";
+      document.getElementById("pr_end").value = "";
+    }
+
+    function renderPlayRecords(list) {
+      const tb = document.getElementById("playTbody");
+      if (!list || list.length === 0) {
+        tb.innerHTML = '<tr><td colspan="5" class="empty">暂无播放记录</td></tr>';
+        return;
+      }
+      tb.innerHTML = list.map(r => `
+        <tr>
+          <td>${r.id}</td>
+          <td>${r.musicId}</td>
+          <td>${r.duration}</td>
+          <td>${fmtDate(r.syncTime)}</td>
+          <td style="text-align:right">
+            <button class="danger small" onclick="deletePlayRecord(${r.id})">删除</button>
+          </td>
+        </tr>`).join("");
+    }
+
+    async function loadPlayRecords() {
+      const tb = document.getElementById("playTbody");
+      tb.innerHTML = '<tr><td colspan="5" class="empty">加载中…</td></tr>';
+      const params = new URLSearchParams({ userId: currentPlayUser.id });
+      const start = toApiTime(document.getElementById("pr_start").value);
+      const end = toApiTime(document.getElementById("pr_end").value);
+      if (start) params.append("startTime", start);
+      if (end) params.append("endTime", end);
+      try {
+        const r = await fetch(`${PLAY_API}/queryAll?${params.toString()}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) {
+          renderPlayRecords([]);
+          return toast(data.baseVo.errorMessage || "查询失败", false);
+        }
+        renderPlayRecords(data.playRecordVoList || []);
+      } catch (e) {
+        renderPlayRecords([]);
+        toast("请求失败: " + e.message, false);
+      }
+    }
+
+    async function deletePlayRecord(id) {
+      if (!confirm(`确认删除播放记录 (ID: ${id})？`)) return;
+      try {
+        const r = await fetch(`${PLAY_API}/delete?id=${id}`, { method: "DELETE" });
+        const data = await r.json();
+        if (data.success) { toast("删除成功"); loadPlayRecords(); }
+        else toast(data.errorMessage || "删除失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // ---------- 发奖记录（基于 prize_sender 的 PrizeRecordController，运行在 8085 端口） ----------
+    const PRIZE_API = `http://${location.hostname}:8085/prizeRecord`;
+    let currentPrizeUser = { id: null, name: "" };
+    let przPage = 1;
+
+    function openPrizeRecords(id, name) {
+      currentPrizeUser = { id, name };
+      document.getElementById("prizeTitle").textContent = `发奖记录 · ${name} (ID: ${id})`;
+      clearPrizeRange();
+      document.getElementById("prizeMask").classList.add("show");
+      searchPrizeRecords();
+    }
+
+    function closePrizeModal() { document.getElementById("prizeMask").classList.remove("show"); }
+
+    function clearPrizeRange() {
+      document.getElementById("prz_start").value = "";
+      document.getElementById("prz_end").value = "";
+    }
+
+    // 时间范围变化 / 每页数量变化时回到第 1 页
+    function searchPrizeRecords() { przPage = 1; loadPrizeRecords(); }
+    function przPrev() { if (przPage > 1) { przPage--; loadPrizeRecords(); } }
+    function przNext() { przPage++; loadPrizeRecords(); }
+
+    function renderPrizeRecords(list) {
+      const tb = document.getElementById("prizeTbody");
+      if (!list || list.length === 0) {
+        tb.innerHTML = '<tr><td colspan="9" class="empty">暂无发奖记录</td></tr>';
+        return;
+      }
+      tb.innerHTML = list.map(r => `
+        <tr>
+          <td>${r.id}</td>
+          <td>${esc(r.scene)}</td>
+          <td>${esc(r.code)}</td>
+          <td>${esc(r.dateStr)}</td>
+          <td>${r.stage}</td>
+          <td>${r.amount}</td>
+          <td>${fmtDate(r.prizeTime)}</td>
+          <td>${esc(r.outBizNo)}</td>
+          <td style="text-align:right">
+            <button class="danger small" onclick="deletePrizeRecord(${r.id})">删除</button>
+          </td>
+        </tr>`).join("");
+    }
+
+    async function loadPrizeRecords() {
+      const tb = document.getElementById("prizeTbody");
+      tb.innerHTML = '<tr><td colspan="9" class="empty">加载中…</td></tr>';
+      const size = parseInt(document.getElementById("prz_pageSize").value, 10);
+      const startIndex = (przPage - 1) * size;   // 后端为 limit startIndex,pageSize，startIndex 是偏移量
+      const params = new URLSearchParams({
+        userId: currentPrizeUser.id,
+        startIndex: startIndex,
+        pageSize: size
+      });
+      const start = toApiTime(document.getElementById("prz_start").value);
+      const end = toApiTime(document.getElementById("prz_end").value);
+      if (start) params.append("startTime", start);
+      if (end) params.append("endTime", end);
+      try {
+        const r = await fetch(`${PRIZE_API}/queryAll?${params.toString()}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) {
+          renderPrizeRecords([]);
+          return toast(data.baseVo.errorMessage || "查询失败", false);
+        }
+        const list = data.prizeRecordVoList || [];
+        if (!list.length && przPage > 1) { przPage--; return toast("已经是最后一页", false); }
+        renderPrizeRecords(list);
+        document.getElementById("przPageNo").textContent = `第 ${przPage} 页`;
+        document.getElementById("przPrevBtn").disabled = przPage <= 1;
+        document.getElementById("przNextBtn").disabled = list.length < size;
+      } catch (e) {
+        renderPrizeRecords([]);
+        toast("请求失败: " + e.message, false);
+      }
+    }
+
+    async function deletePrizeRecord(id) {
+      if (!confirm(`确认删除发奖记录 (ID: ${id})？`)) return;
+      try {
+        const r = await fetch(`${PRIZE_API}/delete?id=${id}`, { method: "DELETE" });
+        const data = await r.json();
+        if (data.success) { toast("删除成功"); loadPrizeRecords(); }
+        else toast(data.errorMessage || "删除失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function submitForm() {
+      const id = document.getElementById("f_id").value;
+      const payload = {
+        name: document.getElementById("f_name").value.trim(),
+        password: document.getElementById("f_password").value,
+        email: document.getElementById("f_email").value.trim(),
+        interests: document.getElementById("f_interests").value.trim(),
+        age: parseInt(document.getElementById("f_age").value, 10) || 0,
+        gender: document.getElementById("f_gender").value
+      };
+      if (!payload.name) return toast("用户名不能为空", false);
+
+      const isEdit = !!id;
+      if (isEdit) payload.id = parseInt(id, 10);
+
+      try {
+        const r = await fetch(`${API}/${isEdit ? "modify" : "register"}`, {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await r.json();
+        if (data.success) {
+          toast(isEdit ? "修改成功" : "新增成功");
+          closeModal();
+          loadAll();
+        } else {
+          toast(data.errorMassage || "操作失败", false);
+        }
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function removeUser(id, name) {
+      if (!confirm(`确认删除用户「${name}」(ID: ${id})？`)) return;
+      try {
+        const r = await fetch(`${API}/delete?id=${id}`, { method: "DELETE" });
+        const data = await r.json();
+        if (data.success) { toast("删除成功"); loadAll(); }
+        else toast(data.errorMassage || "删除失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // ---------- 我的点赞 ----------
+    async function loadMyLikes() {
+      const name = sessionStorage.getItem("musicUser");
+      document.getElementById("myLikeUser").textContent = name || "";
+      const box = document.getElementById("myLikes");
+      try {
+        // 先由用户名解析出当前用户 id
+        const ru = await fetch(`${API}/name?name=${encodeURIComponent(name)}`);
+        const du = await ru.json();
+        const users = du.userVoList || [];
+        const me = users.find(u => u.name === name) || users[0];
+        if (!me) { box.innerHTML = '<div class="empty">未找到当前用户</div>'; return; }
+
+        const r = await fetch(`/like/user?userId=${me.id}`);
+        const d = await r.json();
+        if (d.baseVo && !d.baseVo.success) { box.innerHTML = '<div class="empty">加载失败</div>'; return; }
+        const list = d.musicVoList || [];
+        if (!list.length) { box.innerHTML = '<div class="empty">还没有点赞任何音乐</div>'; return; }
+        box.innerHTML = list.map(m => `
+          <a class="like-music" href="detail.html?id=${m.id}" title="查看详情">
+            <span class="lm-ico">♪</span>
+            <span>
+              <div class="lm-title">${esc(m.title)}</div>
+              <div class="lm-author">${esc(m.author) || "未知歌手"}</div>
+            </span>
+          </a>`).join("");
+      } catch (e) {
+        box.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+      }
+    }
+
+    // 回车搜索
+    document.getElementById("searchName").addEventListener("keydown", e => { if (e.key === "Enter") searchByName(); });
+    document.getElementById("searchId").addEventListener("keydown", e => { if (e.key === "Enter") searchById(); });
+
+    loadMyLikes();
+    loadAll();
+  </script>
+</body>
+</html>

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>奖品中心</title>
+  <link rel="stylesheet" href="css/qqmusic.css">
+  <script defer src="js/shell.js"></script>
+  <style>
+    .prize-icon { font-size: 20px; }
+    .stock-low { color: var(--qm-red); font-weight: 600; }
+    .pager { margin-top: 12px; }
+    td .small { margin-left: 4px; }
+  </style>
+</head>
+<body>
+  <main class="qm-main">
+    <header class="qm-top">
+      <a class="qm-back" href="javascript:backToMusic()" title="返回音乐">←</a>
+      <div>
+        <h1>🪙 奖品中心</h1>
+        <div class="sub">PrizeController · /prize</div>
+      </div>
+      <input id="searchId" type="number" class="search" placeholder="按 ID 查询奖品…" style="width:200px" />
+      <button class="small" onclick="searchById()">查询</button>
+    </header>
+
+    <div class="qm-content">
+      <div class="card">
+        <div class="toolbar">
+          <button onclick="openAdd()">+ 新增奖品</button>
+          <button class="ghost" onclick="firstPage()">全部奖品</button>
+          <span style="flex:1"></span>
+          <label style="font-size:13px;color:var(--qm-text-2)">每页</label>
+          <select id="pageSize" onchange="firstPage()">
+            <option value="6">6</option>
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>券码 CODE</th><th>库存</th><th>图标</th><th>更新时间</th><th style="text-align:right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td colspan="6" class="empty">加载中…</td></tr>
+          </tbody>
+        </table>
+        <div class="pager">
+          <button class="ghost small" id="prevBtn" onclick="prevPage()">上一页</button>
+          <span class="pn" id="pageNo">第 1 页</span>
+          <button class="ghost small" id="nextBtn" onclick="nextPage()">下一页</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 新增 / 编辑弹窗 -->
+  <div class="mask" id="mask">
+    <div class="modal">
+      <h3 id="modalTitle">新增奖品</h3>
+      <input type="hidden" id="f_id" />
+      <div class="field"><label>券码 CODE</label><input id="f_code" placeholder="奖品券码" /></div>
+      <div class="field"><label>库存</label><input id="f_stock" type="number" min="0" placeholder="剩余库存数量" /></div>
+      <div class="field"><label>图标（emoji 或 URL）</label><input id="f_icon" placeholder="🎁 或 图标地址" /></div>
+      <div class="modal-actions">
+        <button class="ghost" onclick="closeModal()">取消</button>
+        <button onclick="submitForm()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const API = "/prize";
+    let page = 1;
+
+    function backToMusic() {
+      // music 应用运行在 8080 端口
+      location.href = `http://${location.hostname}:8080/music.html`;
+    }
+
+    function toast(msg, ok = true) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "show " + (ok ? "ok" : "err");
+      setTimeout(() => (t.className = ""), 2200);
+    }
+
+    function fmtDate(d) {
+      if (!d) return "-";
+      const dt = new Date(d);
+      if (isNaN(dt)) return d;
+      const p = n => String(n).padStart(2, "0");
+      return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+    }
+
+    function iconCell(icon) {
+      const v = String(icon ?? "").trim();
+      if (!v) return "-";
+      if (/^https?:\/\//i.test(v)) return `<img src="${esc(v)}" alt="icon" style="height:24px;vertical-align:middle" />`;
+      return `<span class="prize-icon">${esc(v)}</span>`;
+    }
+
+    function render(prizes) {
+      const tb = document.getElementById("tbody");
+      if (!prizes || prizes.length === 0) {
+        tb.innerHTML = '<tr><td colspan="6" class="empty">没有匹配的奖品</td></tr>';
+        return;
+      }
+      tb.innerHTML = prizes.map(p => `
+        <tr>
+          <td>${p.id}</td>
+          <td>${esc(p.code)}</td>
+          <td class="${p.stock <= 0 ? 'stock-low' : ''}">${p.stock}</td>
+          <td>${iconCell(p.icon)}</td>
+          <td>${fmtDate(p.updateTime)}</td>
+          <td style="text-align:right">
+            <button class="ghost small" onclick='openEdit(${JSON.stringify(p)})'>编辑</button>
+            <button class="danger small" onclick="removePrize(${p.id}, '${esc(p.code)}')">删除</button>
+          </td>
+        </tr>`).join("");
+    }
+
+    // ---------- 分页查询 ----------
+    function firstPage() { page = 1; loadPage(); }
+    function prevPage() { if (page > 1) { page--; loadPage(); } }
+    function nextPage() { page++; loadPage(); }
+
+    async function loadPage() {
+      const tb = document.getElementById("tbody");
+      tb.innerHTML = '<tr><td colspan="6" class="empty">加载中…</td></tr>';
+      const size = parseInt(document.getElementById("pageSize").value, 10);
+      const startIndex = (page - 1) * size;
+      try {
+        const r = await fetch(`${API}/all?startIndex=${startIndex}&size=${size}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) {
+          render([]);
+          return toast(data.baseVo.errorMessage || "加载失败", false);
+        }
+        const list = data.prizeVoList || [];
+        if (!list.length && page > 1) { page--; return toast("已经是最后一页", false); }
+        render(list);
+        document.getElementById("pageNo").textContent = `第 ${page} 页`;
+        document.getElementById("prevBtn").disabled = page <= 1;
+        document.getElementById("nextBtn").disabled = list.length < size;
+      } catch (e) {
+        render([]);
+        toast("请求失败: " + e.message, false);
+      }
+    }
+
+    async function searchById() {
+      const id = document.getElementById("searchId").value.trim();
+      if (!id) return firstPage();
+      try {
+        const r = await fetch(`${API}/id?id=${encodeURIComponent(id)}`);
+        const data = await r.json();
+        if (data.baseVo && !data.baseVo.success) {
+          render([]);
+          return toast(data.baseVo.errorMessage || "未找到", false);
+        }
+        render(data.prizeVo ? [data.prizeVo] : []);
+        document.getElementById("pageNo").textContent = `查询结果`;
+        document.getElementById("prevBtn").disabled = true;
+        document.getElementById("nextBtn").disabled = true;
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // ---------- 新增 / 编辑 ----------
+    function openAdd() {
+      document.getElementById("modalTitle").textContent = "新增奖品";
+      document.getElementById("f_id").value = "";
+      document.getElementById("f_code").value = "";
+      document.getElementById("f_stock").value = "";
+      document.getElementById("f_icon").value = "";
+      document.getElementById("mask").classList.add("show");
+    }
+
+    function openEdit(p) {
+      document.getElementById("modalTitle").textContent = "编辑奖品 #" + p.id;
+      document.getElementById("f_id").value = p.id;
+      document.getElementById("f_code").value = p.code ?? "";
+      document.getElementById("f_stock").value = p.stock ?? 0;
+      document.getElementById("f_icon").value = p.icon ?? "";
+      document.getElementById("mask").classList.add("show");
+    }
+
+    function closeModal() { document.getElementById("mask").classList.remove("show"); }
+
+    async function submitForm() {
+      const id = document.getElementById("f_id").value;
+      const payload = {
+        code: document.getElementById("f_code").value.trim(),
+        stock: parseInt(document.getElementById("f_stock").value, 10) || 0,
+        icon: document.getElementById("f_icon").value.trim()
+      };
+      if (!payload.code) return toast("券码不能为空", false);
+
+      const isEdit = !!id;
+      if (isEdit) payload.id = parseInt(id, 10);
+
+      try {
+        const r = await fetch(`${API}/${isEdit ? "modify" : "add"}`, {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await r.json();
+        if (data.success) {
+          toast(isEdit ? "修改成功" : "新增成功");
+          closeModal();
+          loadPage();
+        } else {
+          toast(data.errorMessage || "操作失败", false);
+        }
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    async function removePrize(id, code) {
+      if (!confirm(`确认删除奖品「${code}」(ID: ${id})？`)) return;
+      try {
+        const r = await fetch(`${API}/delete?id=${id}`, { method: "DELETE" });
+        const data = await r.json();
+        if (data.success) { toast("删除成功"); loadPage(); }
+        else toast(data.errorMessage || "删除失败", false);
+      } catch (e) { toast("请求失败: " + e.message, false); }
+    }
+
+    // 回车搜索
+    document.getElementById("searchId").addEventListener("keydown", e => { if (e.key === "Enter") searchById(); });
+
+    firstPage();
+  </script>
+</body>
+</html>
