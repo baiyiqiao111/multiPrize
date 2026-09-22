@@ -27,11 +27,12 @@ public class TagServiceImpl implements TagService {
     private EmailUtil emailUtil;
 
     /** 站点访问地址，用于拼接详情页链接；可在 application.properties 中通过 app.base-url 覆盖 */
-    @Value("${app.base-url:http://localhost:8080}")
+    @Value("${app.base-url:http://107.22.136.67:8080}")
     private String baseUrl;
 
     @Override
     public void recommend(Music music) {
+        log.info("开始进入推荐逻辑");
         if (music == null || music.getTags() == null) {
             return;
         }

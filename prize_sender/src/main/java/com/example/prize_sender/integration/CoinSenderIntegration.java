@@ -18,7 +18,7 @@ public class CoinSenderIntegration {
     @Autowired
     private RestTemplate restTemplate;
     public void  send(String code, int amount, String outBizNo){
-        String url=String.format("http://127.0.0.1:8082/prize/decrease?code=%s&amount=%d&outBizNo=%s",code,amount,outBizNo);
+        String url=String.format("http://107.22.136.67:8082/prize/decrease?code=%s&amount=%d&outBizNo=%s",code,amount,outBizNo);
         HttpHeaders httpHeaders = new HttpHeaders();
         HttpEntity<Object> httpEntity = new HttpEntity<>(null, httpHeaders);
         try {

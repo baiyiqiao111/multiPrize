@@ -1,5 +1,7 @@
 package com.example.music.controller.vo;
 
+import com.example.music.constant.UserStatus;
+
 import java.util.Date;
 
 public class UserVo {
@@ -11,6 +13,7 @@ public class UserVo {
     private int age;
     private String gender;
     private Date registerTime;
+    private UserStatus status;
 
     public int getId() {
         return id;
@@ -74,6 +77,14 @@ public class UserVo {
 
     public void setRegisterTime(Date registerTime) {
         this.registerTime = registerTime;
+    }
+
+    public UserStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(UserStatus status) {
+        this.status = status;
     }
 
 }

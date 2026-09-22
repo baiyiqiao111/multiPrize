@@ -1,5 +1,6 @@
 package com.example.music.mapper;
 
+import com.example.music.constant.UserStatus;
 import com.example.music.entity.User;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -19,6 +20,9 @@ public interface UserMapper {
 
     /** 修改用户信息 */
     void update(User user);
+
+    /** 修改用户状态（激活） */
+    int updateStatus(@Param("id") int id, @Param("status") UserStatus status);
 
     /** 查询所有用户 */
     List<User> selectAll();

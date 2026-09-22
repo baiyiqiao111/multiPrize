@@ -4,11 +4,15 @@ import com.example.music.common.Result;
 import com.example.music.controller.cmd.ModifyUserCmd;
 import com.example.music.controller.cmd.RegisterCmd;
 import com.example.music.controller.converter.UserVoConverter;
+import com.example.music.controller.vo.ActivateStateVo;
 import com.example.music.controller.vo.BaseVo;
 import com.example.music.controller.vo.MultiUserVo;
+import com.example.music.controller.vo.RegisterVo;
 import com.example.music.controller.vo.SingleUserVo;
 import com.example.music.controller.vo.UserVo;
 import com.example.music.entity.User;
+import com.example.music.exception.ActivateCodeNotMatchException;
+import com.example.music.exception.UserNotExistException;
 import com.example.music.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,15 +27,37 @@ public class UserController {
     private UserService userService;
 
     @PostMapping("/register")
-    public BaseVo register(@RequestBody RegisterCmd registerCmd) {
+    public RegisterVo register(@RequestBody RegisterCmd registerCmd) {
         long start = System.currentTimeMillis();
         long end;
         try {
-            userService.register(registerCmd);
+            int userId = userService.register(registerCmd);
+
+            end = System.currentTimeMillis();
+            RegisterVo registerVo = new RegisterVo(200, end - start, true, null);
+            registerVo.setUserId(userId);
+            return registerVo;
+        } catch (IllegalArgumentException e) {
+            log.error(e.getMessage());
+            end = System.currentTimeMillis();
+            return new RegisterVo(500, end - start, false, e.getMessage());
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            end = System.currentTimeMillis();
+            return new RegisterVo(500, end - start, false, "其它位置异常");
+        }
+    }
+
+    @PutMapping("/activate")
+    public BaseVo activate(int userId, String inputCode) {
+        long start = System.currentTimeMillis();
+        long end;
+        try {
+            userService.activate(userId, inputCode);
 
             end = System.currentTimeMillis();
             return new BaseVo(200, end - start, true, null);
-        } catch (IllegalArgumentException e) {
+        } catch (UserNotExistException | ActivateCodeNotMatchException e) {
             log.error(e.getMessage());
             end = System.currentTimeMillis();
             return new BaseVo(500, end - start, false, e.getMessage());
@@ -39,6 +65,49 @@ public class UserController {
             log.error(e.getMessage());
             end = System.currentTimeMillis();
             return new BaseVo(500, end - start, false, "其它位置异常");
+        }
+    }
+
+    /** 激活码 10 分钟过期，过期后前端调这个接口重新发一封 */
+    @PostMapping("/activate/code")
+    public BaseVo sendActivateCode(int userId) {
+        long start = System.currentTimeMillis();
+        long end;
+        try {
+            userService.resendActivateCode(userId);
+
+            end = System.currentTimeMillis();
+            return new BaseVo(200, end - start, true, null);
+        } catch (UserNotExistException | IllegalArgumentException e) {
+            log.error(e.getMessage());
+            end = System.currentTimeMillis();
+            return new BaseVo(500, end - start, false, e.getMessage());
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            end = System.currentTimeMillis();
+            return new BaseVo(500, end - start, false, "其它位置异常");
+        }
+    }
+
+    /** 激活页只知道用户名时，用用户名换 userId 和当前状态 */
+    @GetMapping("/activate/state")
+    public ActivateStateVo activateState(String name) {
+        long start = System.currentTimeMillis();
+        long end;
+        try {
+            User user = userService.queryByExactName(name);
+            end = System.currentTimeMillis();
+            if (user == null) {
+                return new ActivateStateVo(500, end - start, false, "用户不存在");
+            }
+            ActivateStateVo activateStateVo = new ActivateStateVo(200, end - start, true, null);
+            activateStateVo.setUserId(user.getId());
+            activateStateVo.setStatus(user.getStatus());
+            return activateStateVo;
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            end = System.currentTimeMillis();
+            return new ActivateStateVo(500, end - start, false, "其它位置异常");
         }
     }
 

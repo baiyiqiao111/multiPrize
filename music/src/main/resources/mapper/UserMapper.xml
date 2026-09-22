@@ -12,16 +12,17 @@
         <result column="age" property="age"/>
         <result column="gender" property="gender"/>
         <result column="register_time" property="registerTime"/>
+        <result column="status" property="status"/>
     </resultMap>
 
     <sql id="baseColumns">
-        id, name, password, email, interests, age, gender, register_time
+        id, name, password, email, interests, age, gender, register_time, status
     </sql>
 
     <insert id="insert" parameterType="com.example.music.entity.User"
             useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO user (name, password, email, interests, age, gender, register_time)
-        VALUES (#{name}, #{password}, #{email}, #{interests}, #{age}, #{gender}, now())
+        INSERT INTO user (name, password, email, interests, age, gender, register_time, status)
+        VALUES (#{name}, #{password}, #{email}, #{interests}, #{age}, #{gender}, now(), #{status})
     </insert>
 
     <delete id="deleteById">
@@ -37,8 +38,13 @@
             <if test="interests != null">interests = #{interests},</if>
             <if test="age != null">age = #{age},</if>
             <if test="gender != null">gender = #{gender},</if>
+            <if test="status != null">status = #{status},</if>
         </set>
         WHERE id = #{id}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE user SET status = #{status} WHERE id = #{id}
     </update>
 
     <select id="selectAll" resultMap="userMap">

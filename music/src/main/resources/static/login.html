@@ -27,12 +27,21 @@
     <div class="err" id="err"></div>
 
     <div class="foot">还没有账号？<a href="register.html">立即注册</a></div>
+    <div class="foot">账号还没激活？<a href="activate.html">输入激活码激活</a></div>
   </div>
 
   <script>
     const API = "/user";
 
     function setErr(msg) { document.getElementById("err").textContent = msg || ""; }
+
+    // 登录成功后的去向：优先回跳 redirect 参数指定的页面（如邮件推荐的音乐详情页）
+    // 只接受站内相对地址，避免被构造成跳转外站的链接
+    function nextUrl() {
+      const raw = new URLSearchParams(location.search).get("redirect") || "";
+      if (!raw || raw.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(raw)) return "music.html";
+      return raw;
+    }
 
     async function doLogin() {
       const name = document.getElementById("name").value.trim();
@@ -53,7 +62,7 @@
         const data = await r.json();
         if (data.success) {
           sessionStorage.setItem("musicUser", name);
-          location.replace("music.html");
+          location.replace(nextUrl());
         } else {
           setErr(data.errorMessage || "用户名或密码错误");
           btn.disabled = false; btn.textContent = "登 录";
@@ -65,7 +74,7 @@
     }
 
     // 已登录则直接进入
-    if (sessionStorage.getItem("musicUser")) location.replace("music.html");
+    if (sessionStorage.getItem("musicUser")) location.replace(nextUrl());
 
     // 回车登录
     ["name", "password"].forEach(id =>

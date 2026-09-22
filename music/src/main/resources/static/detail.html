@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>音乐详情</title>
   <script>
-    // 登录守卫：未登录跳转登录页
-    if (!sessionStorage.getItem("musicUser")) location.replace("login.html");
+    // 登录守卫：未登录跳转登录页，并带上当前地址，登录后回跳（邮件推荐链接直达详情页时用到）
+    if (!sessionStorage.getItem("musicUser")) {
+      const back = location.pathname.split("/").pop() + location.search;
+      location.replace("login.html?redirect=" + encodeURIComponent(back));
+    }
   </script>
   <link rel="stylesheet" href="css/qqmusic.css">
   <script defer src="js/shell.js"></script>

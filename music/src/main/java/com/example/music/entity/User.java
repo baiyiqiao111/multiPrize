@@ -1,5 +1,7 @@
 package com.example.music.entity;
 
+import com.example.music.constant.UserStatus;
+
 import java.util.Date;
 
 public class User {
@@ -11,6 +13,7 @@ public class User {
     private int age;
     private String gender;
     private Date registerTime;
+    private UserStatus status;
 
     public int getId() {
         return id;
@@ -76,7 +79,15 @@ public class User {
         this.gender = gender;
     }
 
-    public User(int id, String name, String password, String email, String interests, int age, String gender, Date registerTime) {
+    public UserStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(UserStatus status) {
+        this.status = status;
+    }
+
+    public User(int id, String name, String password, String email, String interests, int age, String gender, Date registerTime, UserStatus status) {
         this.id = id;
         this.name = name;
         this.password = password;
@@ -85,6 +96,7 @@ public class User {
         this.age = age;
         this.gender = gender;
         this.registerTime = registerTime;
+        this.status = status;
     }
 
     public User() {

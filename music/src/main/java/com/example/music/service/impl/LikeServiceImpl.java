@@ -41,12 +41,18 @@ public class LikeServiceImpl implements LikeService {
     @Override
     public List<Music> queryUserLikeList(int userId) {
         List<Integer> userLikeList = likeRepository.getUserLikeList(userId);
+        if(userLikeList==null||userLikeList.size()==0){
+            return new ArrayList<>();
+        }
         return musicMapper.queryByIds(userLikeList);
     }
 
     @Override
     public List<User> queryMusicLikeList(int musicId) {
         List<Integer> musicLikeList = likeRepository.getMusicLikeList(musicId);
+        if(musicLikeList==null||musicLikeList.size()==0){
+            return new ArrayList<>();
+        }
         return userMapper.queryByIds(new HashSet<>(musicLikeList));
     }
 }

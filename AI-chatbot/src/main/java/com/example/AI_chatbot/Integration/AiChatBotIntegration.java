@@ -23,8 +23,8 @@ import java.util.List;
 @Slf4j
 @Service
 public class AiChatBotIntegration {
-    private static final String PRIZE_SENDER = "http://127.0.0.1:8085";
-    private static final String PRIZE_CENTER = "http://127.0.0.1:8082";
+    private static final String PRIZE_SENDER = "http://107.22.136.67:8085";
+    private static final String PRIZE_CENTER = "http://107.22.136.67:8082";
 
     @Autowired
     private RestTemplate restTemplate;

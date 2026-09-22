@@ -1,20 +1,25 @@
 package com.example.music.service.impl;
 
+import com.example.music.constant.DemoConstant;
+import com.example.music.constant.UserStatus;
 import com.example.music.controller.cmd.ModifyUserCmd;
 import com.example.music.controller.cmd.RegisterCmd;
-import com.example.music.controller.vo.BaseVo;
 import com.example.music.entity.User;
 import com.example.music.entity.UserToken;
+import com.example.music.exception.ActivateCodeNotMatchException;
 import com.example.music.exception.PasswordWrongException;
 import com.example.music.exception.UserNotExistException;
+import com.example.music.integration.EmailUtil;
 import com.example.music.mapper.UserMapper;
 import com.example.music.producer.AddUserProducer;
+import com.example.music.repository.ActiveCodeRepository;
 import com.example.music.repository.TagRepository;
 import com.example.music.repository.UserTokenRepository;
 import com.example.music.service.UserService;
+import com.example.music.util.ActivateCodeUtil;
+import jakarta.mail.MessagingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,10 +39,14 @@ public class UserServiceImpl implements UserService {
     private TagRepository tagRepository;
     @Autowired
     private AddUserProducer addUserProducer;
+    @Autowired
+    private ActiveCodeRepository activeCodeRepository;
+    @Autowired
+    private EmailUtil emailUtil;
 
     //todo:添加用户入参是一个cmd
     @Override
-    public void register(RegisterCmd registerCmd) {
+    public int register(RegisterCmd registerCmd) {
         // 用户名查重
         User exist = userMapper.selectByExactName(registerCmd.getName());
         if (exist != null) {
@@ -50,12 +59,15 @@ public class UserServiceImpl implements UserService {
         user.setEmail(registerCmd.getEmail());
         user.setAge(registerCmd.getAge());
         user.setInterests(registerCmd.getInterests());
+        // 注册出来的账号是未激活的，要拿邮件里的激活码激活
+        user.setStatus(UserStatus.INIT);
 
         if (user.getRegisterTime() == null) {
             user.setRegisterTime(new Date());
         }
         userMapper.insert(user);
         User userInDb = userMapper.selectByExactName(user.getName());
+        sendActivateCode(userInDb);
         String[] newTagArray = registerCmd.getInterests().split(",");
         Set<String> removed = shouldRemoved(new String[0], newTagArray);
         Set<String> add = shouldAdd(new String[0], newTagArray);
@@ -67,6 +79,7 @@ public class UserServiceImpl implements UserService {
         for (String o : add) {
             tagRepository.add(o,userInDb.getId());
         }
+        return userInDb.getId();
     }
 
     @Override
@@ -139,6 +152,61 @@ public class UserServiceImpl implements UserService {
             tagRepository.add(o,userId);
         }
     }
+
+    @Override
+    public void activate(int userId, String inputCode) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new UserNotExistException("用户不存在");
+        }
+        if (UserStatus.ACTIVE == user.getStatus()) {
+            log.info("用户{}已经是激活状态，无需重复激活", userId);
+            return;
+        }
+        String expectCode = activeCodeRepository.get(userId);
+        // redis 里的激活码 10 分钟过期，过期后取不到值
+        if (expectCode == null) {
+            throw new ActivateCodeNotMatchException("激活码已过期，请重新获取");
+        }
+        if (!expectCode.equals(inputCode)){
+            throw new ActivateCodeNotMatchException("验证码不匹配，激活失败");
+        }
+        userMapper.updateStatus(userId, UserStatus.ACTIVE);
+        // 激活码用过就作废，避免被重复使用
+        activeCodeRepository.delete(userId);
+        log.info("用户{}激活成功", userId);
+    }
+
+    @Override
+    public void resendActivateCode(int userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new UserNotExistException("用户不存在");
+        }
+        if (UserStatus.ACTIVE == user.getStatus()) {
+            throw new IllegalArgumentException("账号已激活，无需再次获取激活码");
+        }
+        sendActivateCode(user);
+    }
+
+    @Override
+    public User queryByExactName(String name) {
+        return userMapper.selectByExactName(name);
+    }
+
+    /** 生成激活码写入 redis，并把激活码邮件发到用户邮箱 */
+    private void sendActivateCode(User user) {
+        String activeCode = ActivateCodeUtil.generate();
+        activeCodeRepository.set(user.getId(), activeCode);
+        String emailContent = DemoConstant.EMAIL_CONTENT.replace("123456", activeCode);
+        try {
+            emailUtil.sendMile(user.getEmail(), "账号激活", emailContent);
+        } catch (MessagingException e) {
+//            throw new RuntimeException(e);
+            log.error("邮件发送失败，{}", e);
+        }
+    }
+
     private Set<String> shouldRemoved(String[] oldTagArray,String[] newTagArray){
         Set<String> newSet = new HashSet<>();
         Set<String> oldSet = new HashSet<>();

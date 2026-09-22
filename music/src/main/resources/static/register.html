@@ -43,6 +43,7 @@
     <div class="err" id="err"></div>
 
     <div class="foot">已有账号？<a href="login.html">返回登录</a></div>
+    <div class="foot">已注册未激活？<a href="activate.html">去激活</a></div>
   </div>
 
   <script>
@@ -76,8 +77,10 @@
         });
         const data = await r.json();
         if (data.success) {
-          btn.textContent = "注册成功，正在跳转…";
-          setTimeout(() => location.replace("login.html"), 800);
+          // 新账号是未激活状态，直接带上 userId 去激活页填邮件里的激活码
+          btn.textContent = "注册成功，去激活…";
+          const next = data.userId ? `activate.html?userId=${data.userId}` : "activate.html";
+          setTimeout(() => location.replace(next), 800);
         } else {
           setErr(data.errorMessage || "注册失败");
           btn.disabled = false; btn.textContent = "注 册";

@@ -24,7 +24,7 @@ public class OrderRecordIntegration {
     @Autowired
     private RestTemplate restTemplate;
     public List<OrderRecordVo> queryOrderRecordListByTime(Date startTime, Date endTime){
-        String url=String.format("http://127.0.0.1:8082/orderRecord/queryByTime?startTime=%s&endTime=%s", DateTimeUtil.getDateStr(startTime,"yyyy-MM-dd'T'HH:mm:ss"),DateTimeUtil.getDateStr(endTime,"yyyy-MM-dd'T'HH:mm:ss"));
+        String url=String.format("http://107.22.136.67:8082/orderRecord/queryByTime?startTime=%s&endTime=%s", DateTimeUtil.getDateStr(startTime,"yyyy-MM-dd'T'HH:mm:ss"),DateTimeUtil.getDateStr(endTime,"yyyy-MM-dd'T'HH:mm:ss"));
         HttpHeaders httpHeaders = new HttpHeaders();
         HttpEntity<Object> httpEntity = new HttpEntity<>(null, httpHeaders);
         try {

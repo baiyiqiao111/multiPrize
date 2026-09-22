@@ -17,6 +17,7 @@ public class UserVoConverter {
         userVo.setEmail(user.getEmail());
         userVo.setAge(user.getAge());
         userVo.setInterests(user.getInterests());
+        userVo.setStatus(user.getStatus());
         return userVo;
     }
     public static List<UserVo> convertToVoList(List<User> userList){
