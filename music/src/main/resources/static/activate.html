@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>激活账号 · 音乐管理</title>
+  <link rel="stylesheet" href="css/qqmusic.css">
+  <style>
+    .field { margin-bottom: 16px; }
+    #code { letter-spacing: 8px; text-align: center; font-size: 20px; }
+    .ok { color: var(--qm-green-dark); font-size: 13px; min-height: 18px; }
+    .link-btn {
+      background: none; border: none; padding: 0; width: auto;
+      color: var(--qm-green-dark); font-size: 13px; cursor: pointer; text-decoration: underline;
+    }
+    .link-btn:disabled { color: #999; cursor: default; text-decoration: none; }
+  </style>
+</head>
+<body class="qm-auth">
+  <div class="auth-card">
+    <div class="logo">♪</div>
+    <h1>激活账号</h1>
+    <div class="sub">激活码已发送到注册邮箱，10 分钟内有效</div>
+
+    <div class="field" id="nameField">
+      <label>用户名</label>
+      <input id="name" autocomplete="username" placeholder="请输入注册时的用户名" />
+    </div>
+    <div class="field">
+      <label>激活码</label>
+      <input id="code" inputmode="numeric" maxlength="6" placeholder="6 位激活码" />
+    </div>
+
+    <button class="primary" id="btn" onclick="doActivate()">激 活</button>
+    <div class="err" id="err"></div>
+    <div class="ok" id="msg"></div>
+
+    <div class="foot">
+      <button class="link-btn" id="resend" onclick="doResend()">没收到？重新发送激活码</button>
+    </div>
+    <div class="foot">已激活？<a href="login.html">返回登录</a></div>
+  </div>
+
+  <script>
+    const API = "/user";
+
+    // userId 优先取注册后回跳带过来的 ?userId=，取不到就让用户填用户名换
+    let userId = parseInt(new URLSearchParams(location.search).get("userId"), 10);
+    if (!isFinite(userId) || userId <= 0) userId = null;
+
+    const nameField = document.getElementById("nameField");
+    if (userId) nameField.style.display = "none";
+
+    function setErr(m) { document.getElementById("err").textContent = m || ""; }
+    function setMsg(m) { document.getElementById("msg").textContent = m || ""; }
+
+    // 没有 userId 时用用户名换一个；顺带判断是不是已经激活过了
+    async function resolveUserId() {
+      if (userId) return userId;
+      const name = document.getElementById("name").value.trim();
+      if (!name) { setErr("请输入用户名"); return null; }
+
+      const r = await fetch(`${API}/activate/state?name=${encodeURIComponent(name)}`);
+      const data = await r.json();
+      if (!data.success) { setErr(data.errorMessage || "用户不存在"); return null; }
+      if (data.status === "ACTIVE") {
+        setErr("");
+        setMsg("该账号已激活，正在跳转登录…");
+        setTimeout(() => location.replace("login.html"), 800);
+        return null;
+      }
+      userId = data.userId;
+      return userId;
+    }
+
+    async function doActivate() {
+      setErr(""); setMsg("");
+      const code = document.getElementById("code").value.trim();
+      if (!code) return setErr("请输入激活码");
+
+      const btn = document.getElementById("btn");
+      btn.disabled = true; btn.textContent = "激活中…";
+
+      try {
+        const id = await resolveUserId();
+        if (!id) { btn.disabled = false; btn.textContent = "激 活"; return; }
+
+        const body = new URLSearchParams({ userId: id, inputCode: code });
+        const r = await fetch(`${API}/activate`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body
+        });
+        const data = await r.json();
+        if (data.success) {
+          btn.textContent = "激活成功，正在跳转…";
+          setMsg("账号已激活");
+          setTimeout(() => location.replace("login.html"), 800);
+        } else {
+          setErr(data.errorMessage || "激活失败");
+          btn.disabled = false; btn.textContent = "激 活";
+        }
+      } catch (e) {
+        setErr("请求失败：" + e.message);
+        btn.disabled = false; btn.textContent = "激 活";
+      }
+    }
+
+    async function doResend() {
+      setErr(""); setMsg("");
+      const resend = document.getElementById("resend");
+      resend.disabled = true;
+
+      try {
+        const id = await resolveUserId();
+        if (!id) { resend.disabled = false; return; }
+
+        const r = await fetch(`${API}/activate/code`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ userId: id })
+        });
+        const data = await r.json();
+        if (data.success) {
+          setMsg("激活码已重新发送，请查收邮件");
+          // 60 秒内不让重复点，避免狂发邮件
+          let left = 60;
+          resend.textContent = `重新发送（${left}s）`;
+          const timer = setInterval(() => {
+            left -= 1;
+            if (left <= 0) {
+              clearInterval(timer);
+              resend.disabled = false;
+              resend.textContent = "没收到？重新发送激活码";
+            } else {
+              resend.textContent = `重新发送（${left}s）`;
+            }
+          }, 1000);
+        } else {
+          setErr(data.errorMessage || "发送失败");
+          resend.disabled = false;
+        }
+      } catch (e) {
+        setErr("请求失败：" + e.message);
+        resend.disabled = false;
+      }
+    }
+
+    // 回车激活
+    document.querySelectorAll("input").forEach(el =>
+      el.addEventListener("keydown", e => { if (e.key === "Enter") doActivate(); }));
+  </script>
+</body>
+</html>
