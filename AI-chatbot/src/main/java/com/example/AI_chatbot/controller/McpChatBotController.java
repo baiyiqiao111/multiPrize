@@ -1,10 +1,12 @@
 package com.example.AI_chatbot.controller;
 
+import com.example.AI_chatbot.agent.MusicAgent;
 import com.example.AI_chatbot.controller.Vo.AnswerVo;
 import com.example.AI_chatbot.controller.Vo.BaseVo;
 import com.example.AI_chatbot.controller.cmd.ChatQueryCmd;
 import com.example.AI_chatbot.service.IntentRecognizeService;
 import com.example.AI_chatbot.service.McpChatBotService;
+import com.example.AI_chatbot.tool.AIAgentTool;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -22,6 +24,9 @@ public class McpChatBotController {
     private IntentRecognizeService intentRecognizeService;
     @Autowired
     public McpChatBotService mcpChatBotService;
+    @Autowired
+    private MusicAgent musicAgent;
+
     @PostMapping("/ask")
     public AnswerVo ask(@RequestBody ChatQueryCmd chatQueryCmd){
         long start = System.currentTimeMillis();
@@ -29,7 +34,8 @@ public class McpChatBotController {
         AnswerVo answerVo = new AnswerVo();
 
         try {
-            String answer = intentRecognizeService.chat(chatQueryCmd.getQuestion(), chatQueryCmd.getUserId(),chatQueryCmd.getSessionId());
+//            String answer = intentRecognizeService.chat(chatQueryCmd.getQuestion(), chatQueryCmd.getUserId(),chatQueryCmd.getSessionId());
+            String answer = musicAgent.chat(chatQueryCmd.getSessionId(), chatQueryCmd.getQuestion(), chatQueryCmd.getUserId());
             answerVo.setAnswer(answer);
 
             end = System.currentTimeMillis();

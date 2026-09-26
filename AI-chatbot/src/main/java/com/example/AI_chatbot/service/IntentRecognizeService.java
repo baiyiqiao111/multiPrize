@@ -37,6 +37,7 @@ public class IntentRecognizeService {
         mcpProfessionalContextManager.appendMessage(sessionId,questionChatMessage);
         List<ChatMessage> context = mcpProfessionalContextManager.getContext(sessionId);
         String answer = openAiClientService.chatCompletion(context);
+        log.info("answer="+answer);
         if(answer==null||answer.isBlank()){
             throw new IllegalStateException("大模型没有返回内容，请检查OpenAI接口是否可用（日志里有具体原因）");
         }
