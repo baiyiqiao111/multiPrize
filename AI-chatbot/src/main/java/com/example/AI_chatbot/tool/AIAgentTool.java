@@ -3,6 +3,7 @@ package com.example.AI_chatbot.tool;
 import com.example.AI_chatbot.Integration.AiChatBotIntegration;
 import com.example.AI_chatbot.Integration.vo.PlayRecordVo;
 import com.example.AI_chatbot.Integration.vo.PrizeRecordVo;
+import com.example.AI_chatbot.controller.Vo.SystemConfigVo;
 import com.example.AI_chatbot.service.IntentRecognizeService;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
@@ -32,5 +33,11 @@ public class AIAgentTool {
                                                 @ToolParam(description = "开始页面，当用户未指定的时候，默认0开始")int pageStart,
                                                 @ToolParam(description = "页面大小，当用户未指定的时候，默认为10000")int pageSize){
         return aiChatBotIntegration.queryPrizeRecordListByTime((Integer) toolContext.getContext().get("userId"),startTime,endTime,pageStart,pageSize);
+    }
+    @Tool(name = "querySystemConfig",description = "当需要查询指定编码的系统配置时调用，在当前场景下用于查询发奖规则")
+    public SystemConfigVo querySystemConfig(//@ToolParam 定义工具的参数提示词，参数获取规则
+                                            @ToolParam(description = "规则编码，在此场景下规则编码只能是PRIZE_AMOUNT_RULE和PRIZE_STAGE_RULE，其中PRIZE_AMOUNT_RULE代表每一个时长和发奖数量的对应规则，PRIZE_STAGE_RULE代表每一个阶段的对应规则")String code) {
+        //工具的执行过程，大模型不干涉，大模型工具选择，不干涉工具执行过程
+        return aiChatBotIntegration.querySystemConfigVo(code);
     }
 }

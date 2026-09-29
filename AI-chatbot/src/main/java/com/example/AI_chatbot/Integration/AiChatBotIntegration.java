@@ -1,10 +1,9 @@
 package com.example.AI_chatbot.Integration;
 
 import com.example.AI_chatbot.Integration.vo.*;
-import com.example.AI_chatbot.exception.QueryOrderRecordException;
-import com.example.AI_chatbot.exception.QueryPlayRecordException;
-import com.example.AI_chatbot.exception.QueryPlayRecordStatisticException;
-import com.example.AI_chatbot.exception.QueryPrizeRecordException;
+import com.example.AI_chatbot.controller.Vo.SingleSystemConfigVo;
+import com.example.AI_chatbot.controller.Vo.SystemConfigVo;
+import com.example.AI_chatbot.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
@@ -118,6 +117,26 @@ public class AiChatBotIntegration {
         }catch(Exception e){
             log.error("调用第三方系统查询奖品扣减记录失败，url={}", uri, e);
             return new ArrayList<>();
+        }
+    }
+    public SystemConfigVo querySystemConfigVo(String code){
+        URI uri = UriComponentsBuilder.fromUriString(PRIZE_SENDER + "/system-config/code")
+                .queryParam("code",code)
+                .build()
+                .encode()
+                .toUri();
+        HttpHeaders httpHeaders = new HttpHeaders();
+        HttpEntity<Object> httpEntity = new HttpEntity<>(null, httpHeaders);
+        try {
+            ResponseEntity<SingleSystemConfigVo> response = restTemplate.exchange(uri, HttpMethod.GET,httpEntity, SingleSystemConfigVo.class);
+            SingleSystemConfigVo body = response.getBody();
+            if(body==null||body.getBaseVo()==null||!body.getBaseVo().isSuccess()) {
+                throw new QuerySystemConfigException("调用第三方系统查询播放总时长记录失败");
+            }
+            return  body.getSystemConfigVo();
+        }catch(Exception e){
+            log.error("调用第三方系统查询播放总时长记录失败，url={}", uri, e);
+            return null;
         }
     }
 }
