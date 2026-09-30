@@ -120,22 +120,24 @@ public class AiChatBotIntegration {
         }
     }
     public SystemConfigVo querySystemConfigVo(String code){
-        URI uri = UriComponentsBuilder.fromUriString(PRIZE_SENDER + "/system-config/code")
-                .queryParam("code",code)
-                .build()
-                .encode()
-                .toUri();
-        HttpHeaders httpHeaders = new HttpHeaders();
-        HttpEntity<Object> httpEntity = new HttpEntity<>(null, httpHeaders);
+//        URI uri = UriComponentsBuilder.fromUriString(PRIZE_SENDER + "/system-config/code")
+//                .queryParam("code",code)
+//                .build()
+//                .encode()
+//                .toUri();
+        String url = PRIZE_SENDER + "/system-config/code/"+code;
+//        HttpHeaders httpHeaders = new HttpHeaders();
+//        HttpEntity<Object> httpEntity = new HttpEntity<>(null, httpHeaders);
         try {
-            ResponseEntity<SingleSystemConfigVo> response = restTemplate.exchange(uri, HttpMethod.GET,httpEntity, SingleSystemConfigVo.class);
+//            ResponseEntity<SingleSystemConfigVo> response = restTemplate.exchange(uri, HttpMethod.GET,httpEntity, SingleSystemConfigVo.class);
+            ResponseEntity<SingleSystemConfigVo> response = restTemplate.getForEntity(url, SingleSystemConfigVo.class);
             SingleSystemConfigVo body = response.getBody();
             if(body==null||body.getBaseVo()==null||!body.getBaseVo().isSuccess()) {
                 throw new QuerySystemConfigException("调用第三方系统查询播放总时长记录失败");
             }
             return  body.getSystemConfigVo();
         }catch(Exception e){
-            log.error("调用第三方系统查询播放总时长记录失败，url={}", uri, e);
+            log.error("调用第三方系统查询播放总时长记录失败，url={}", url, e);
             return null;
         }
     }

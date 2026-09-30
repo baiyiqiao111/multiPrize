@@ -11,7 +11,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
 
 @Service
 public class AIAgentTool {
@@ -34,10 +34,34 @@ public class AIAgentTool {
                                                 @ToolParam(description = "页面大小，当用户未指定的时候，默认为10000")int pageSize){
         return aiChatBotIntegration.queryPrizeRecordListByTime((Integer) toolContext.getContext().get("userId"),startTime,endTime,pageStart,pageSize);
     }
-    @Tool(name = "querySystemConfig",description = "当需要查询指定编码的系统配置时调用，在当前场景下用于查询发奖规则")
+    @Tool(name = "querySystemConfig",description = "当需要查询指定编码的系统配置时调用，在当前场景下用于查询发奖规则,注意规则内涉及到的时间单位为秒")
     public SystemConfigVo querySystemConfig(//@ToolParam 定义工具的参数提示词，参数获取规则
                                             @ToolParam(description = "规则编码，在此场景下规则编码只能是PRIZE_AMOUNT_RULE和PRIZE_STAGE_RULE，其中PRIZE_AMOUNT_RULE代表每一个时长和发奖数量的对应规则，PRIZE_STAGE_RULE代表每一个阶段的对应规则")String code) {
         //工具的执行过程，大模型不干涉，大模型工具选择，不干涉工具执行过程
         return aiChatBotIntegration.querySystemConfigVo(code);
+    }
+    @Tool(name = "checkPrizeRecord", description = "核对用户指定时间范围内的预期发奖记录与用户的指定时间范围内的实际发奖记录是否一致")
+    public  boolean checkPrizeRecord(           @ToolParam(description = "预期发奖阶段和发奖数量的对应关系") Map<Integer,Integer> expectPrizeRecord,
+                                                @ToolParam(description = "实际发奖数量和发奖阶段对应关系")Map<Integer,Integer> realPrizeRecord){
+        boolean isCountMatch = expectPrizeRecord.size() == realPrizeRecord.size();
+        if(!isCountMatch){
+            return false;
+        }
+        Set<Integer> expectKeyS = expectPrizeRecord.keySet();
+        Set<Integer> realKeyS = realPrizeRecord.keySet();
+        boolean sameSet = isSameSet(expectKeyS, realKeyS);
+        if(sameSet==false){
+            return false;
+        }
+        for(Integer k:realKeyS){
+            if(expectPrizeRecord.get(k)!=realPrizeRecord.get(k)){
+                return false;
+            }
+        }
+        return true;
+
+    }
+    public boolean isSameSet(Set<Integer> set1, Set<Integer> set2) {
+        return Objects.equals(set1, set2);
     }
 }
