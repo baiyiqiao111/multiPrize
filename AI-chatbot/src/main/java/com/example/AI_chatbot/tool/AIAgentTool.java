@@ -41,7 +41,7 @@ public class AIAgentTool {
         return aiChatBotIntegration.querySystemConfigVo(code);
     }
     @Tool(name = "checkPrizeRecord", description = "核对用户指定时间范围内的预期发奖记录与用户的指定时间范围内的实际发奖记录是否一致")
-    public  boolean checkPrizeRecord(           @ToolParam(description = "预期发奖阶段和发奖数量的对应关系") Map<Integer,Integer> expectPrizeRecord,
+    public  boolean checkPrizeRecord(           @ToolParam(description = "预期发奖阶段和发奖数量的对应关系，关系来自于基于发奖规则，用实际播放记录计算的每阶段发奖数量，假设规则为90s,90s-180s为第一阶段发一份奖励，180s-270s为第二阶段再发2份奖励，270s-360s为第三阶段再发4份奖励，假设用户播放240s应该发放第一阶段1份，第二阶段2份，累计三份") Map<Integer,Integer> expectPrizeRecord,
                                                 @ToolParam(description = "实际发奖数量和发奖阶段对应关系")Map<Integer,Integer> realPrizeRecord){
         boolean isCountMatch = expectPrizeRecord.size() == realPrizeRecord.size();
         if(!isCountMatch){
@@ -50,11 +50,11 @@ public class AIAgentTool {
         Set<Integer> expectKeyS = expectPrizeRecord.keySet();
         Set<Integer> realKeyS = realPrizeRecord.keySet();
         boolean sameSet = isSameSet(expectKeyS, realKeyS);
-        if(sameSet==false){
+        if(!sameSet){
             return false;
         }
         for(Integer k:realKeyS){
-            if(expectPrizeRecord.get(k)!=realPrizeRecord.get(k)){
+            if(!Objects.equals(expectPrizeRecord.get(k), realPrizeRecord.get(k))){
                 return false;
             }
         }
