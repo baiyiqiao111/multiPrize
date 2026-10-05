@@ -13,6 +13,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
+import java.util.Locale;
 import java.util.Map;
 
 @Slf4j
@@ -43,6 +47,10 @@ public class AgentConfig {
         ChatClient chatClient = chatClientBuilder
                 //相当于设置角色身份
                 .defaultSystem("""
+                当前时间是：{currentTime}（今天是 {today}，{dayOfWeek}）。
+                用户提到今天、昨天、本周、最近7天等相对时间，或者没有指定结束时间时，都以这个时间为准换算，
+                调用工具时时间格式为 yyyy-MM-dd HH:mm:ss，日期格式为 yyyy-MM-dd。
+
                 你是一个助手，可以使用工具查找用户需要的数据，
                 把ToolService里面的返回结果封装成自然语言给用户。
                 在处理结果时，注意：
@@ -70,10 +78,17 @@ public class AgentConfig {
             log.info("userId = {}, sessionId = {}",userId,sessionId);
             // 避免不同用户碰巧使用相同 sessionId 导致上下文串线
             String conversationId = userId + ":" + sessionId;
+            //模型自己不知道"今天"是几号，每次请求都把当前时间告诉它，否则"查今天"会算错日期
+            LocalDateTime now = LocalDateTime.now();
 
             return chatClient
                     //创建这一次用户请求。
                     .prompt()
+                    //只填充 defaultSystem 里的时间占位符，系统提示词本身不变
+                    .system(system -> system
+                            .param("currentTime", now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
+                            .param("today", now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
+                            .param("dayOfWeek", now.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.CHINA)))
                     //设置用户问题
                     .user(userInput)
                     //这里是在给 Advisor 传递本次请求特有的参数。比如上下文记忆的位置和会话id等
